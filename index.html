@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>伊莫家园生产计算器</title>
-<link rel="stylesheet" href="./style.css?v=28">
+<link rel="stylesheet" href="./style.css?v=29">
 </head>
 <body>
 
@@ -60,7 +60,7 @@
 
   <!-- 概览卡片 -->
   <section id="overview" class="cards" aria-label="方案概览">
-    <div class="card"><div class="k">最优总价值（LP 上界）</div><div class="v" id="ov-lp">—</div><div class="sub" id="ov-cond">—</div></div>
+    <div class="card"><div class="k">最优总价值（理论上限）</div><div class="v" id="ov-lp">—</div><div class="sub" id="ov-cond">—</div></div>
     <div class="card"><div class="k" id="ov-int-k">整数可行方案</div><div class="v" id="ov-int">—</div><div class="sub" id="ov-ratio">—</div></div>
     <div class="card"><div class="k">出售产物种类</div><div class="v" id="ov-kinds">—</div><div class="sub" id="ov-top">—</div></div>
     <div class="card"><div class="k" id="ov-bn-k">平均每小时净利润</div><div class="v" id="ov-bn">—</div><div class="sub" id="ov-bn2">—</div></div>
@@ -130,7 +130,7 @@
     <div class="table-wrap">
       <table id="plan-table">
         <thead><tr>
-          <th>建筑(数量)</th><th>产物</th><th>轮次</th><th>LP轮次</th>
+          <th>建筑(数量)</th><th>产物</th><th>轮次</th><th>理论轮次</th>
           <th>单轮时长</th><th>占用安排</th>
         </tr></thead>
         <tbody></tbody>
@@ -186,6 +186,6 @@
 
 
 <script src="./echarts.min.js"></script>
-<script type="module" src="./app.js?v=28"></script>
+<script type="module" src="./app.js?v=29"></script>
 </body>
 </html>

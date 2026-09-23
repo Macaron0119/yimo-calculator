@@ -420,7 +420,7 @@ function renderArrangement(r) {
           `${r.lazy ? `，峰值${fmt(p.slots)}座` : ""}）`;
       }
       html += `<span class="it"><span class="dot" style="background:${colorOf(p.label)}"></span>` +
-        `<b>${p.seasonal ? "★" : ""}${p.source ? p.source + "·" : ""}${p.label}</b> ${txt}</span>`;
+        `<b>${p.seasonal ? "★" : ""}${p.label}</b> ${txt}</span>`;
     }
     html += `</div></div>`;
   }
@@ -561,7 +561,7 @@ function renderPlanTable(r) {
           (r.lazy ? ` · 峰值${fmt(p.slots)}座` : "");
       }
       html += `<tr><td></td>` +
-        `<td>${p.seasonal ? '<span class="star">★</span>' : ""}${p.source ? p.source + "·" : ""}${p.label}</td>` +
+        `<td>${p.seasonal ? '<span class="star">★</span>' : ""}${p.label}</td>` +
         `<td class="ok">${fmt(p.batches_int)}</td>` +
         `<td>${fmt1(p.batches)}</td>` +
         `<td>${timeStr(p.time_per_batch)}</td>` +
@@ -691,7 +691,7 @@ function pinRow(building = "", recipeId = "", n = "") {
     const rs = state.recipes.filter((r) => r.building === bSel.value);
     rSel.innerHTML = `<option value=""${curRid ? "" : " selected"} disabled>选择产物…</option>` +
       rs.map((r) => `<option value="${r.id}"${r.id == curRid ? " selected" : ""}>` +
-        `${recipeLabel(r)}${r.source ? `（${r.source}）` : ""}</option>`).join("");
+        `${recipeLabel(r)}</option>`).join("");
     updateFilled();
   };
   const autoGrow = () => {            // 填完最后一行时自动追加一行空白
