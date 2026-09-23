@@ -821,7 +821,8 @@ function renderProducts() {
 
   let rows = state.products.map((p) => ({
     ...p,
-    matstr: (p.materials || []).map((m) => `${m.item}×${m.qty ?? "?"}`).join("、"),
+    matstr: (p.seed_price ? `种子${fmt(p.seed_price)}、` : "") +
+      (p.materials || []).map((m) => `${m.item}×${m.qty ?? "?"}`).join("、"),
   }));
   if (bfilter) rows = rows.filter((p) => p.building === bfilter);
   if (onlyAvail) rows = rows.filter((p) => p.available);

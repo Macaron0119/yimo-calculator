@@ -352,7 +352,9 @@ export function createEngine(gameData, solve) {
         item: inp.item, qty: inp.qty, price: pm[inp.item] != null ? pm[inp.item] : null,
         cost: (inp.qty || 0) * (pm[inp.item] || 0),
       }));
-      const cost = mats.reduce((s, m) => s + m.cost, 0);
+      let cost = mats.reduce((s, m) => s + m.cost, 0);
+      if (rec.seed_price != null && Number(rec.seed_price) > 0)
+        cost += Number(rec.seed_price);                // 每轮种子
       const net = gross - cost;
       let reason = "";
       if (!availSet.has(rec.id)) {
@@ -365,7 +367,8 @@ export function createEngine(gameData, solve) {
         req_level: rec.req_level, seasonal: !!rec.is_seasonal, ttype, time: t,
         output_qty: rec.output_qty, sell_price: rec.sell_price,
         extra_product: rec.extra_product, extra_qty: rec.extra_qty,
-        gross, cost, net, net_per_hour: t ? net / t * 3600 : null,
+        gross, cost, net, seed_price: rec.seed_price,
+        net_per_hour: t ? net / t * 3600 : null,
         materials: mats, available: availSet.has(rec.id), reason,
       });
     }
@@ -480,7 +483,11 @@ export function createEngine(gameData, solve) {
         .reduce((s, [i, q]) => s + q * (pm[i] || 0), 0);
       rec.inval = rec.inputs.reduce((s, i) => s + (i.qty || 0) * (pm[i.item] || 0), 0);
     }
-    for (const rec of pool) rec.coeff = rec.outval - rec.inval;
+    for (const rec of pool) {
+      rec.coeff = rec.outval - rec.inval;
+      if (rec.seed_price != null && Number(rec.seed_price) > 0)
+        rec.coeff -= Number(rec.seed_price);           // 每轮种植消耗一粒种子
+    }
 
     if (lazy) {
       const res = optimizeLazy(pool, T, coeff, level, hours, counts, pm, warns,
