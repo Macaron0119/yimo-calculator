@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>伊莫家园生产计算器</title>
+<link rel="stylesheet" href="static/style.css?v=21">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">伊莫家园生产计算器</div>
+  <div class="controls">
+    <label>当前等级
+      <input id="level" type="number" min="1" max="60" placeholder="不限">
+    </label>
+    <label>时长
+      <select id="hours">
+        <option value="6">6 小时</option>
+        <option value="12">12 小时</option>
+        <option value="24" selected>24 小时</option>
+        <option value="48">48 小时</option>
+        <option value="custom">自定义…</option>
+      </select>
+      <input id="hours-custom" type="number" min="1" max="240" value="8" class="hidden">
+    </label>
+    <label>工作系数%
+      <input id="coeff" type="number" min="5" max="1000" step="5" value="100">
+    </label>
+    <label class="chk" title="勾选后月露萝卜、盈月椒等赛季作物参与规划；自定义生产里设定的不受此影响">
+      <input id="opt-use-seasonal" type="checkbox"> 赛季配方
+    </label>
+    <label class="chk" title="原料建筑全程不换配方，制造建筑不受限">
+      <input id="opt-lazy" type="checkbox"> 懒人模式
+    </label>
+    <label id="sw-wrap" class="chk hidden" title="原料建筑最多用几种配方，自定义生产不占额度">
+      原料配方
+      <select id="max-recipes">
+        <option value="" selected>不限</option>
+        <option value="1">每种1种·整齐划一</option>
+        <option value="2">每种≤2种</option>
+        <option value="3">每种≤3种</option>
+      </select>
+    </label>
+    <label id="sw2-wrap" class="chk hidden" title="全程统一换几次配方，所有原料建筑同时换">
+      换配方
+      <select id="max-switch">
+        <option value="0" selected>不换</option>
+        <option value="1">最多1次</option>
+        <option value="2">最多2次</option>
+      </select>
+    </label>
+    <button id="btn-run" class="primary">计算最优方案</button>
+  </div>
+</header>
+
+<div id="error-banner" class="error hidden" role="alert"></div>
+
+<main>
+
+  <!-- 概览卡片 -->
+  <section id="overview" class="cards" aria-label="方案概览">
+    <div class="card"><div class="k">最优总价值（LP 上界）</div><div class="v" id="ov-lp">—</div><div class="sub" id="ov-cond">—</div></div>
+    <div class="card"><div class="k" id="ov-int-k">整数可行方案</div><div class="v" id="ov-int">—</div><div class="sub" id="ov-ratio">—</div></div>
+    <div class="card"><div class="k">出售产物种类</div><div class="v" id="ov-kinds">—</div><div class="sub" id="ov-top">—</div></div>
+    <div class="card"><div class="k" id="ov-bn-k">平均每小时净利润</div><div class="v" id="ov-bn">—</div><div class="sub" id="ov-bn2">—</div></div>
+  </section>
+  <!-- 规划配置: 2x2 —— 数据管理 / 工作效率 / 存量资源 / 自定义生产 -->
+  <section class="panel" id="config-section">
+    <h3>规划配置</h3>
+    <div class="cfg-grid">
+
+      <div class="cfg-block" id="counts-section">
+        <h4>数据管理</h4>
+        <div class="hint mb6">调整各建筑的拥有数量</div>
+        <div id="building-editor" class="bgrid"></div>
+      </div>
+
+      <div class="cfg-block" id="eff-section">
+        <h4>工作效率</h4>
+        <div class="hint mb6">各建筑单独效率%，留空用全局系数</div>
+        <div id="eff-rows" class="bgrid"></div>
+        <div class="filters">
+          <span id="eff-status" class="hint"></span>
+        </div>
+      </div>
+
+      <div class="cfg-block" id="stock-section">
+        <h4>存量资源</h4>
+        <div id="stock-rows"></div>
+        <div class="filters">
+          <button id="btn-stock-add" class="ghost" type="button">添加一行</button>
+          <span id="stock-status" class="hint"></span>
+        </div>
+      </div>
+
+      <div class="cfg-block" id="pin-section">
+        <h4>自定义生产</h4>
+        <div id="pin-rows" class="pin-grid"></div>
+        <div class="filters">
+          <button id="btn-pin-add" class="ghost" type="button">添加一项</button>
+          <span id="pin-status" class="hint"></span>
+        </div>
+      </div>
+
+    </div>
+    <datalist id="item-names"></datalist>
+  </section>
+
+
+  <!-- 直观种植安排 -->
+  <section class="panel" id="arr-section">
+    <h3>种植与生产安排</h3>
+    <div class="hint" id="arr-hint">计算后此处展示每个建筑直观的生产安排。</div>
+    <div id="arr-body"></div>
+  </section>
+
+  <!-- 图表 -->
+  <section class="grid2">
+    <div class="panel"><h3>出售价值构成</h3><div id="chart-sell" class="chart"></div></div>
+    <div class="panel"><h3 id="net-title">产物净利润（时长内）</h3><div id="chart-net" class="chart"></div></div>
+    <div class="panel"><h3>产物净收益排行 前15</h3><div id="chart-rank" class="chart"></div></div>
+  </section>
+
+  <!-- 最优方案 -->
+  <section class="panel">
+    <h3>最优生产方案明细</h3>
+    <div id="pin-used" class="stock-used hidden"></div>
+    <div id="stock-used" class="stock-used hidden"></div>
+    <div class="table-wrap">
+      <table id="plan-table">
+        <thead><tr>
+          <th>建筑(数量)</th><th>产物</th><th>轮次</th><th>LP轮次</th>
+          <th>单轮时长</th><th>占用安排</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <details class="mt">
+      <summary>物料平衡</summary>
+      <div class="table-wrap tall">
+        <table id="flow-table">
+          <thead><tr><th>物品</th><th>产出</th><th>消耗</th><th>盈余</th>
+            <th>盈余价值</th><th>产出/小时</th><th>消耗/小时</th><th>消耗去向（占比）</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </details>
+    <details class="mt">
+      <summary>未参与计算的配方及原因</summary>
+      <div id="excluded-list" class="tags"></div>
+    </details>
+  </section>
+
+  <!-- 产物收益浏览器 -->
+  <section class="panel">
+    <h3>产物收益浏览器 <span class="hint">材料按售价折算成本</span></h3>
+    <div class="filters">
+      <select id="f-building" aria-label="按建筑筛选"><option value="">全部建筑</option></select>
+      <input id="f-search" type="text" placeholder="搜索产物或材料…" aria-label="搜索">
+      <label class="chk"><input id="f-avail" type="checkbox" checked> 仅显示当前可用</label>
+      <label class="chk"><input id="f-positive" type="checkbox"> 仅正收益</label>
+    </div>
+    <div class="table-wrap tall">
+      <table id="prod-table">
+        <thead><tr>
+          <th data-k="label" data-t="s">产物</th>
+          <th data-k="building" data-t="s">建筑</th>
+          <th data-k="req_level" data-t="n">等级</th>
+          <th data-k="time" data-t="n">单轮秒</th>
+          <th data-k="output_qty" data-t="n">产量</th>
+          <th data-k="sell_price" data-t="n">售价</th>
+          <th data-k="gross" data-t="n">单轮产值</th>
+          <th data-k="cost" data-t="n">材料成本</th>
+          <th data-k="net" data-t="n">净收益/轮</th>
+          <th data-k="net_per_hour" data-t="n">净收益/小时</th>
+          <th>状态</th>
+          <th data-k="matstr" data-t="s">材料</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+
+<script src="static/echarts.min.js"></script>
+<script type="module" src="static/app.js?v=21"></script>
+</body>
+</html>
