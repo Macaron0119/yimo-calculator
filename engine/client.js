@@ -10,7 +10,8 @@ export function getEngine() {
     enginePromise = (async () => {
       const [highs, data] = await Promise.all([
         loadHighs(),
-        fetch(new URL("../game_data.json", import.meta.url)).then((r) => {
+        fetch(new URL("../game_data.json", import.meta.url),
+          { cache: "no-cache" }).then((r) => {
           if (!r.ok) throw new Error("游戏数据加载失败");
           return r.json();
         }),
