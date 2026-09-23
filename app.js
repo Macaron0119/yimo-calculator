@@ -717,7 +717,7 @@ function renderPinRows() {
         const r = state.recipes.find((x) => x.id === p.recipe_id);
         return `${p.building}→${r ? recipeLabel(r) : "?"}${p.n ? `×${p.n}` : ""}`;
       }).join("、")
-    : "填好即生效，自动存本机";
+    : "";
 }
 
 /* 面板当前内容的即时收集(计算时直接生效, 保存仅持久化);
@@ -779,7 +779,7 @@ function persistPins() {
         const r = state.recipes.find((x) => x.id === p.recipe_id);
         return `${p.building}→${r ? recipeLabel(r) : "?"}${p.n ? `×${p.n}` : ""}`;
       }).join("、") + "（本机自动保存）"
-    : "填好即生效，自动存本机";
+    : "";
   showError("");
 }
 function persistCounts() {
