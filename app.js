@@ -1,5 +1,5 @@
 /* 伊莫家园生产计算器 前端逻辑(纯前端: 本地引擎 + localStorage) */
-import { getEngine } from "./engine/client.js";
+import { getEngine, getGameData } from "./engine/client.js";
 import { store } from "./engine/store.js";
 
 "use strict";
@@ -37,6 +37,7 @@ const state = {
   pins: [],
   products: [], prodSort: { k: "net_per_hour", dir: -1 },
   lastResult: null,
+  creatures: [], formLabels: {},
 };
 
 /* 与后端 unique_label 一致的配方显示名(同名碰撞时高产版加"高速", 不显示等级) */
@@ -882,11 +883,14 @@ function renderBuildingEditor() {
 
 async function refreshData() {
   const engine = await getEngine();
+  const gdata = await getGameData();
   const d = store.load();
   const counts = d.counts || {};
   state.buildings = engine.buildings.map((b) => ({
     name: b.name, count: counts[b.name] != null ? counts[b.name] : b.count }));
   state.recipes = engine.recipes;
+  state.creatures = gdata.creatures || [];
+  state.formLabels = gdata.form_labels || {};
   state.stock = d.stock || {};
   state.buildingEff = d.eff || {};
   state.pins = (d.pins || [])
@@ -908,6 +912,7 @@ async function refreshData() {
     .sort((a, b) => a.localeCompare(b, "zh"));
   $("#item-names").innerHTML = names.map((n) => `<option value="${n}">`).join("");
   await loadProducts();
+  initYimo();
 }
 
 /* ---------------- 本机设置恢复/自动保存 ---------------- */
@@ -1040,6 +1045,298 @@ $("#pin-rows").addEventListener("input", autoSave(persistPins));
   el.addEventListener("change", saveSettings);
   el.addEventListener("input", autoSave(saveSettings));
 });
+
+/* ================= 伊莫图鉴 tab ================= */
+/* 能力ID -> 展示名(库内为 wiki 原名: 岩/割除/特殊/采香产香) */
+const ABILITY_NAMES = {
+  1000: "火", 1001: "草", 1002: "水", 1003: "土", 1004: "电", 1005: "冰",
+  1006: "风", 1007: "暗", 1008: "光", 1100: "搬运", 1101: "手工",
+  1102: "游玩", 1103: "制香",
+};
+/* 伊莫属性展示名: 库内"岩"游戏内叫"土" */
+const EL_DISPLAY = { "岩": "土" };
+const elName = (e) => EL_DISPLAY[e] || e;
+/* 属性 -> 元素能力ID(取对应图标, 岗位属性条件折算成能力筛选) */
+const EL_ABID = {
+  "火": 1000, "草": 1001, "水": 1002, "岩": 1003, "电": 1004,
+  "冰": 1005, "风": 1006, "暗": 1007, "光": 1008,
+};
+const abIcon = (id) => `./icons/${id}.png`;
+const STAGE_NAMES = { "1": "新生期", "2": "成长期", "3": "成熟期" };
+
+/* 家族=进化链成员编号(供岗位推荐"XX家族"筛选) */
+const FAMILY_SERIALS = {
+  "云朵羊": ["017", "018", "019"],           // 云朵羊/蓬蓬羊/眠眠羊
+  "羞羞獭": ["049", "050", "051", "052"],    // 羞羞獭/泡泡獭/漂漂獭/胖胖獭
+  "采蜜鸟": ["038", "039"],                  // 采蜜鸟/香氛鸟
+};
+
+/* 建筑岗位条件: mbti 为后天养成性格(仅展示); kind/v 为可筛选的先天条件
+   (element 的 v 用库内属性值, 展示时经 elName 转换) */
+const STATION_TRAITS = {
+  "矿山":         { mbti: "P", kind: "element", v: "岩", text: "土属性" },
+  "烟囱煅烧炉":   { mbti: "S", kind: "element", v: "火", text: "火属性" },
+  "木工台":       { mbti: "E", kind: "ability", v: 1101, text: "手工属性" },
+  "绵云草床":     { mbti: "J", kind: "family",  v: "云朵羊", text: "云朵羊家族" },
+  "汐语沙堡":     { mbti: "J", kind: "family",  v: "羞羞獭", text: "羞羞獭家族" },
+  "采蜜鸟屋":     { mbti: "I", kind: "family",  v: "采蜜鸟", text: "采蜜鸟家族", icon: 1103 },
+  "水井":         { mbti: "F", kind: "element", v: "水", text: "水属性" },
+  "手作台":       { mbti: "J", kind: "ability", v: 1101, text: "手工属性" },
+  "旋转木马磨坊": { mbti: "T", kind: "element", v: "风", text: "风属性" },
+  "摩天轮纺车":   { mbti: "F", kind: "element", v: "风", text: "风属性" },
+  "风味腌制罐":   { mbti: "P", kind: "element", v: "暗", text: "暗属性" },
+  "超旺灶台":     { mbti: "N", kind: "element", v: "火", text: "火属性" },
+  "蹦蹦酿造桶":   { mbti: "E", kind: "element", v: "水", text: "水属性" },
+  "音乐烘干机":   { mbti: "N", kind: "element", v: "暗", text: "暗属性" },
+  "熬制锅":       { mbti: "T", kind: "element", v: "火", text: "火属性" },
+  "留声制香台":   { mbti: "I", kind: "family",  v: "采蜜鸟", text: "采蜜鸟家族", icon: 1103 },
+  "抓夹烹饪炉":   { mbti: "S", kind: "element", v: "火", text: "火属性" },
+  /* 库外建筑(暂无配方数据): 仅出现在岗位推荐, 无性格要求 */
+  "日光灯":       { mbti: "",  kind: "element", v: "光", text: "光属性" },
+  "热能炉":       { mbti: "",  kind: "element", v: "火", text: "火属性" },
+  "制冷机":       { mbti: "",  kind: "element", v: "冰", text: "冰属性" },
+};
+const MBTI_DESC = {
+  E: "外向", I: "内向", S: "实感", N: "直觉",
+  T: "思考", F: "情感", J: "条理", P: "随性",
+};
+
+const yimoFilter = {
+  abilities: new Set(),
+  level: 0, family: "", q: "",
+};
+let yimoReady = false;
+
+/* 页签切换: 品牌名/页面标题随页签变化 */
+const TAB_TITLES = {
+  calc: "伊莫·家园生产计算",
+  yimo: "伊莫·家园图鉴",
+};
+function switchTab(name) {
+  $$("#main-tabs .tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  $("#tab-calc").classList.toggle("hidden", name !== "calc");
+  $("#tab-yimo").classList.toggle("hidden", name !== "yimo");
+  const title = TAB_TITLES[name] || TAB_TITLES.calc;
+  $("#brand").textContent = title;
+  document.title = title;
+  if (name === "calc")               // 隐藏期间尺寸变化的图表重排
+    $$(".chart").forEach((el) => el.__chart && el.__chart.resize());
+}
+$("#main-tabs").addEventListener("click", (e) => {
+  const b = e.target.closest(".tab");
+  if (b) switchTab(b.dataset.tab);
+});
+
+function yimoMatch(f) {
+  const ab = {};
+  for (const [id, lv] of f.abilities) ab[id] = lv;
+  if (yimoFilter.abilities.size) {   // 所选能力类型全部具备且达到等级
+    for (const id of yimoFilter.abilities)
+      if (!(ab[id] != null && ab[id] >= Math.max(yimoFilter.level, 1)))
+        return false;
+  } else if (yimoFilter.level >= 2) { // 未选类型: 任意能力达到该等级即可
+    if (!f.abilities.some(([, lv]) => lv >= yimoFilter.level)) return false;
+  }
+  if (yimoFilter.family &&
+      !FAMILY_SERIALS[yimoFilter.family].includes(f.serial))
+    return false;
+  if (yimoFilter.q && !f.name.includes(yimoFilter.q) &&
+      !f.serial.includes(yimoFilter.q))
+    return false;
+  return true;
+}
+
+function renderYimo() {
+  const forms = state.creatures.filter(yimoMatch);
+  const bySerial = new Map();
+  for (const f of forms) {
+    if (!bySerial.has(f.serial)) bySerial.set(f.serial, []);
+    bySerial.get(f.serial).push(f);
+  }
+  const hot = (id) => yimoFilter.abilities.has(id);
+  $("#yimo-results").innerHTML = [...bySerial.values()].map((fs) => {
+    const head = fs[0];
+    const rows = fs.map((f) => {
+      const fl = state.formLabels[f.form] || f.form;
+      const abs = f.abilities.map(([id, lv]) =>
+        `<span class="yab${hot(id) ? " hot" : ""}"><img src="${abIcon(id)}" alt="">${ABILITY_NAMES[id] || id}<i>Lv${lv}</i></span>`).join("");
+      return `<div class="yrow"><span class="yform">${fl}</span>` +
+        `<span class="ystage">${STAGE_NAMES[f.stage] || ""}</span>` +
+        `<span class="yabs">${abs}</span></div>`;
+    }).join("");
+    return `<div class="ycard"><div class="yhead">` +
+      `<span class="ysn">${head.serial}</span><b>${head.name}</b>` +
+      `<span class="yel">${head.element.split("/").map(elName).join("/")}</span></div>${rows}</div>`;
+  }).join("") || `<div class="hint">没有符合条件的伊莫形态，试试放宽筛选</div>`;
+  $("#yimo-count").textContent =
+    `共 ${bySerial.size} 只伊莫 · ${forms.length} 个形态`;
+}
+
+/* 岗位条件(不含性格)在图鉴中的匹配形态数 */
+function stationCount(t) {
+  if (t.kind === "ability")
+    return state.creatures.filter((f) =>
+      f.abilities.some(([id]) => id === t.v)).length;
+  if (t.kind === "element")
+    return state.creatures.filter((f) => f.element.split("/").includes(t.v)).length;
+  return state.creatures.filter((f) =>
+    FAMILY_SERIALS[t.v].includes(f.serial)).length;
+}
+
+/* 无需岗位推荐的建筑(田地/林地种什么都行), 不进岗位区 */
+const STATION_HIDDEN = new Set(["田地", "林地"]);
+
+/* 不在库内但有岗位条件的建筑 */
+const EXTRA_STATIONS = ["日光灯", "热能炉", "制冷机"];
+
+/* 岗位选中态: 点击岗位卡后高亮, 手动改动筛选条件即取消 */
+let stationSel = "";
+function clearStationSel() {
+  if (!stationSel) return;
+  stationSel = "";
+  $$("#station-grid .stcard.sel").forEach((c) => c.classList.remove("sel"));
+}
+
+/* 排序键 = 所需属性(能力ID): 元素按 1000~1008, 家族按图标能力(1102/1103),
+   手工1101; 无条件(待补充)排最后; 同键保持原有先后 */
+function stationSortKey(name) {
+  const t = STATION_TRAITS[name];
+  if (!t) return 9999;
+  if (t.kind === "ability") return t.v;
+  if (t.kind === "element") return EL_ABID[t.v];
+  return t.icon || 1102;
+}
+
+function renderStations() {
+  const names = [...state.buildings.map((b) => b.name), ...EXTRA_STATIONS]
+    .filter((n) => !STATION_HIDDEN.has(n))
+    .map((n, i) => [n, i])
+    .sort((a, b) => stationSortKey(a[0]) - stationSortKey(b[0]) || a[1] - b[1])
+    .map(([n]) => n);
+  $("#station-grid").innerHTML = names
+    .map((name) => {
+      const t = STATION_TRAITS[name];
+      if (!t)
+        return `<div class="stcard missing"><div class="stb">${name}</div>` +
+          `<div class="streq muted">数据待补充</div></div>`;
+      const icon = t.kind === "ability" ? t.v
+        : t.kind === "element" ? EL_ABID[t.v]
+        : (t.icon || 1102);                // 家族专供建筑: 默认游玩, 采香家族用制香
+      const badge = t.mbti
+        ? `<span class="stmbti ${"INFP".includes(t.mbti) ? "warm" : "cool"}" title="${MBTI_DESC[t.mbti] || ""}性格">${t.mbti}</span>`
+        : `<span class="stmbti none" title="无性格要求">?</span>`;
+      return `<div class="stcard${name === stationSel ? " sel" : ""}" data-station="${name}" role="button" tabindex="0">` +
+        `<div class="stb">${name}</div>` +
+        `<div class="streq">${badge}` +
+        (icon ? `<img class="sico" src="${abIcon(icon)}" alt="">` : "") +
+        `${t.text}<span class="stcnt">${stationCount(t)} 形态</span></div></div>`;
+    }).join("");
+}
+
+function syncYimoChips() {
+  $$("#ab-chips .chip").forEach((c) =>
+    c.classList.toggle("on", yimoFilter.abilities.has(+c.dataset.ab)));
+  $$("#lv-chips .chip").forEach((c) =>
+    c.classList.toggle("on", +c.dataset.lv === yimoFilter.level));
+  $("#family-tag-row").classList.toggle("hidden", !yimoFilter.family);
+  $("#family-tags").innerHTML = yimoFilter.family
+    ? `<button type="button" class="chip on">${yimoFilter.family}家族 ✕</button>` : "";
+}
+
+function buildYimoChips() {
+  const abCnt = {};
+  for (const f of state.creatures) {
+    for (const [id] of f.abilities) abCnt[id] = (abCnt[id] || 0) + 1;
+  }
+  $("#ab-chips").innerHTML = Object.keys(ABILITY_NAMES)
+    .filter((id) => abCnt[id])
+    .map((id) =>
+      `<button type="button" class="chip" data-ab="${id}">` +
+      `<img class="cico" src="${abIcon(id)}" alt="">${ABILITY_NAMES[id]}<i>${abCnt[id]}</i></button>`).join("");
+  $("#lv-chips").innerHTML = [[0, "全部"], [2, "Lv2+"], [3, "Lv3+"], [4, "Lv4"]]
+    .map(([v, t]) =>
+      `<button type="button" class="chip${v === 0 ? " on" : ""}" data-lv="${v}">${t}</button>`).join("");
+}
+
+function resetYimoFilter() {
+  clearStationSel();
+  yimoFilter.abilities.clear();
+  yimoFilter.level = 0;
+  yimoFilter.family = "";
+  yimoFilter.q = "";
+  $("#yimo-search").value = "";
+  syncYimoChips();
+  renderYimo();
+}
+
+/* 点击岗位卡片 -> 按该岗位先天条件筛选(性格为后天养成不参与)
+   属性条件折算为对应的元素能力(如 风属性 -> 能力"风") */
+function applyStationFilter(name) {
+  const t = STATION_TRAITS[name];
+  if (!t) return;
+  stationSel = name;
+  yimoFilter.abilities.clear();
+  yimoFilter.family = "";
+  if (t.kind === "ability") yimoFilter.abilities.add(t.v);
+  else if (t.kind === "element") yimoFilter.abilities.add(EL_ABID[t.v]);
+  else yimoFilter.family = t.v;
+  $$("#station-grid .stcard").forEach((c) =>
+    c.classList.toggle("sel", c.dataset.station === name));
+  syncYimoChips();
+  renderYimo();
+  $("#yimo-results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+let yimoSearchTimer = null;
+function initYimo() {
+  if (yimoReady || !state.creatures.length) return;
+  yimoReady = true;
+  buildYimoChips();
+  renderStations();
+  syncYimoChips();
+  renderYimo();
+  $("#ab-chips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    clearStationSel();
+    const id = +c.dataset.ab;
+    yimoFilter.abilities.has(id) ? yimoFilter.abilities.delete(id)
+      : yimoFilter.abilities.add(id);
+    syncYimoChips();
+    renderYimo();
+  });
+  $("#lv-chips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    clearStationSel();
+    yimoFilter.level = +c.dataset.lv;
+    syncYimoChips();
+    renderYimo();
+  });
+  $("#family-tags").addEventListener("click", () => {
+    clearStationSel();
+    yimoFilter.family = "";
+    syncYimoChips();
+    renderYimo();
+  });
+  $("#yimo-search").addEventListener("input", () => {
+    clearTimeout(yimoSearchTimer);
+    yimoSearchTimer = setTimeout(() => {
+      yimoFilter.q = $("#yimo-search").value.trim();
+      renderYimo();
+    }, 150);
+  });
+  $("#yimo-reset").addEventListener("click", resetYimoFilter);
+  $("#station-grid").addEventListener("click", (e) => {
+    const card = e.target.closest(".stcard[data-station]");
+    if (card) applyStationFilter(card.dataset.station);
+  });
+  $("#station-grid").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest(".stcard[data-station]");
+    if (card) { e.preventDefault(); applyStationFilter(card.dataset.station); }
+  });
+}
 
 /* ---------------- 访问统计(GoatCounter) ----------------
    注册 goatcounter.com 后: Settings→API→Create key(只勾 Read statistics),

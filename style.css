@@ -81,6 +81,25 @@ body {
 .controls label.chk:has(input:checked) { color: #FFD9D6; }
 #sw-wrap select, #sw2-wrap select { min-width: 6.5em; }
 
+/* 页内条件栏(浅色): 生产计算页签内的设置区, 与夜色顶栏下的 .controls 区分 */
+.controls.light {
+  margin: 0 0 14px; padding: 10px 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(42, 36, 71, .05);
+}
+.controls.light label { color: var(--ink-2); }
+.controls.light input, .controls.light select {
+  background: #fff; color: var(--ink); border-color: var(--line-strong);
+}
+.controls.light input::placeholder { color: var(--muted); }
+.controls.light input:focus, .controls.light select:focus {
+  background: #fff; border-color: var(--primary); outline: none;
+}
+.controls.light label.chk { color: var(--ink-2); }
+.controls.light label.chk:has(input:checked) { color: var(--primary-deep); font-weight: 600; }
+.controls.light label.chk input { accent-color: var(--primary); }
+.controls.light #btn-run { margin-left: auto; }   /* 计算按钮固定在条件栏最右端 */
+
 button.primary {
   background: linear-gradient(135deg, #FF9E93 0%, #F56D6C 55%, #E4585A 100%);
   color: #fff; border: none; border-radius: 999px;
@@ -420,3 +439,158 @@ summary:hover { color: var(--primary-deep); text-decoration: underline; }
 }
 .stats-bar b { color: var(--primary); font-weight: 650; font-variant-numeric: tabular-nums; }
 .stats-bar .sep { margin: 0 8px; opacity: .5; }
+
+/* ---------- 功能页签 ---------- */
+.tabs {
+  display: flex; gap: 8px;
+  max-width: clamp(1280px, 94vw, 1840px);
+  margin: 14px auto 0;
+  padding: 0 clamp(16px, 2vw, 32px);
+}
+.tab {
+  border: 1px solid var(--primary-border); background: var(--card);
+  color: var(--primary-deep); border-radius: 999px;
+  padding: 7px 26px; font-size: .92rem; font-weight: 600; cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.tab:hover { border-color: var(--primary); }
+.tab.on {
+  background: linear-gradient(135deg, #8472D8, var(--primary) 60%, var(--primary-deep));
+  color: #fff; border-color: var(--primary-deep);
+  box-shadow: 0 3px 12px rgba(87, 68, 159, .35);
+}
+
+/* ---------- 伊莫图鉴: 筛选行 ---------- */
+.yf-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 5px 0; flex-wrap: wrap;
+}
+.yf-row + .yf-row { border-top: 1px dashed var(--line); }
+.yf-label {
+  flex: none; width: 62px; font-size: .82rem; font-weight: 600;
+  color: var(--primary-deep); text-align: right;
+}
+.chipbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  border: 1px solid var(--line-strong); background: #fff;
+  color: var(--ink-2); border-radius: 999px;
+  padding: 3px 12px; font-size: .8rem; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  line-height: 1.2;                      /* 图标/文字/数量同一垂直中心 */
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.chip i {
+  font-style: normal; font-size: .78rem; color: var(--muted);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.chip .cico { width: 16px; height: 16px; object-fit: contain; flex: none; }
+.chip:hover { border-color: var(--primary); color: var(--primary-deep); }
+.chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.chip.on i { color: #E3DBF9; }
+#yimo-search {
+  padding: 5px 10px; border: 1px solid var(--line-strong); border-radius: 6px;
+  font-size: .86rem; width: 220px; background: #fff; color: var(--ink);
+}
+
+/* ---------- 伊莫图鉴: 结果卡片 ---------- */
+.yimo-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.ycard {
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #FBFAFE; padding: 9px 12px;
+}
+.ycard:hover { border-color: var(--primary-border); }
+.yhead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; font-size: .92rem; }
+.yhead .ysn { font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.yhead b { font-weight: 650; color: var(--ink); }
+.yhead .yel {
+  margin-left: auto; font-size: .72rem; color: var(--primary-deep);
+  background: var(--primary-soft); border: 1px solid var(--primary-border);
+  border-radius: 4px; padding: 0 7px; white-space: nowrap;
+}
+.yrow {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 3px 0; border-top: 1px dashed var(--line);
+  font-size: .8rem;
+}
+.yrow:first-of-type { border-top: none; }
+.yform { color: var(--ink-2); font-weight: 600; flex: none; }
+.ystage { color: var(--muted); font-size: .72rem; flex: none; }
+.yabs { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.yab {
+  background: #F1F5F9; border: 1px solid var(--line);
+  border-radius: 4px; padding: 0 7px; font-size: .74rem; color: var(--ink-2);
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 3px;
+}
+.yab img { width: 13px; height: 13px; object-fit: contain; flex: none; }
+.yab i {
+  font-style: normal; margin-left: 3px; color: var(--primary);
+  font-weight: 600; font-size: .68rem;
+}
+.yab.hot {
+  background: var(--primary-soft); border-color: var(--primary-border);
+  color: var(--primary-deep); font-weight: 600;
+}
+.yab.hot i { color: var(--accent); }
+
+/* ---------- 伊莫图鉴: 建筑岗位推荐 ---------- */
+.station-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 10px;
+}
+.stcard {
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #FBFAFE; padding: 9px 12px; cursor: pointer;
+  position: relative;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.stcard:hover, .stcard:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 2px 10px rgba(117, 97, 203, .18);
+}
+/* 岗位选中态: 条件已应用为当前筛选 */
+.stcard.sel {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: 0 2px 10px rgba(117, 97, 203, .22);
+}
+.stcard.sel .stb { color: var(--primary-deep); }
+.stcard.sel::after {
+  content: "✓"; position: absolute; top: 6px; right: 9px;
+  font-size: .7rem; font-weight: 700; color: var(--primary);
+}
+.stcard.missing { cursor: default; opacity: .62; background: #FAFAFC; }
+.stcard.missing:hover { border-color: var(--line); box-shadow: none; }
+.stb { font-size: .9rem; font-weight: 650; color: var(--ink); margin-bottom: 3px; }
+.streq {
+  font-size: .78rem; color: var(--ink-2);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.streq.muted { color: var(--muted); }
+.stmbti {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  color: #FFFFFF; font-size: .72rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* 性格配色: INFP 一侧(I/N/F/P)=暖粉, ESTJ 一侧(E/S/T/J)=清蓝, 字母白色 */
+.stmbti.warm { background: #E979B3; box-shadow: 0 1px 5px rgba(233, 121, 179, .4); }
+.stmbti.cool { background: #6BB3ED; box-shadow: 0 1px 5px rgba(107, 179, 237, .4); }
+.stmbti.none { background: #9B95B8; box-shadow: 0 1px 5px rgba(155, 149, 184, .35); }
+.sico { width: 18px; height: 18px; object-fit: contain; flex: none; }
+.stcnt {
+  margin-left: auto; font-size: .72rem; color: var(--primary);
+  font-weight: 600; white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .tabs { justify-content: center; margin-top: 10px; }
+  .tab { padding: 6px 18px; font-size: .88rem; }
+  .yf-row { gap: 8px; }
+  .yf-label { width: 56px; text-align: left; }
+  .yimo-grid { grid-template-columns: 1fr; }
+  .station-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  #yimo-search { width: auto; flex: 1; min-width: 120px; }
+}

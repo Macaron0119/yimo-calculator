@@ -3,14 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>伊莫家园生产计算器</title>
-<link rel="stylesheet" href="./style.css?v=32">
+<title>伊莫·家园生产计算</title>
+<link rel="stylesheet" href="./style.css?v=43">
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand">伊莫家园生产计算器</div>
-  <div class="controls">
+  <div class="brand" id="brand">伊莫·家园生产计算</div>
+</header>
+
+<div id="error-banner" class="error hidden" role="alert"></div>
+
+<nav class="tabs" id="main-tabs" aria-label="功能页签">
+  <button type="button" class="tab on" data-tab="calc">生产计算</button>
+  <button type="button" class="tab" data-tab="yimo">能力图鉴</button>
+</nav>
+
+<main>
+
+  <div id="tab-calc">
+
+  <!-- 条件设置(页内) -->
+  <div class="controls light" id="calc-controls">
     <label>当前等级
       <input id="level" type="number" min="1" max="60" value="10" placeholder="不限">
     </label>
@@ -52,11 +66,6 @@
     </label>
     <button id="btn-run" class="primary">计算最优方案</button>
   </div>
-</header>
-
-<div id="error-banner" class="error hidden" role="alert"></div>
-
-<main>
 
   <!-- 概览卡片 -->
   <section id="overview" class="cards" aria-label="方案概览">
@@ -182,6 +191,36 @@
     </div>
   </section>
 
+  </div><!-- /tab-calc -->
+
+  <!-- ======================= 能力图鉴 tab ======================= -->
+  <div id="tab-yimo" class="hidden">
+
+    <section class="panel">
+      <h3>建筑岗位推荐</h3>
+      <div id="station-grid" class="station-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h3>伊莫筛选</h3>
+      <div class="yf-row"><span class="yf-label">能力类型</span><div id="ab-chips" class="chipbar"></div></div>
+      <div class="yf-row"><span class="yf-label">能力等级</span><div id="lv-chips" class="chipbar"></div></div>
+      <div class="yf-row hidden" id="family-tag-row"><span class="yf-label">家族</span><div id="family-tags" class="chipbar"></div></div>
+      <div class="yf-row">
+        <span class="yf-label">搜索</span>
+        <input id="yimo-search" type="search" placeholder="名称或编号，如：蓬蓬羊 / 018">
+        <button id="yimo-reset" class="ghost" type="button">重置</button>
+        <span id="yimo-count" class="hint"></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>筛选结果</h3>
+      <div id="yimo-results" class="yimo-grid"></div>
+    </section>
+
+  </div><!-- /tab-yimo -->
+
 </main>
 
 
@@ -192,6 +231,6 @@
 </div>
 
 <script src="./echarts.min.js"></script>
-<script type="module" src="./app.js?v=32"></script>
+<script type="module" src="./app.js?v=43"></script>
 </body>
 </html>

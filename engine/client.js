@@ -3,19 +3,27 @@ import { createEngine } from "./core.js";
 import { makeSolver } from "./lp.js";
 import loadHighs from "./vendor/highs.mjs";
 
+let dataPromise = null;
 let enginePromise = null;
+
+export function getGameData() {
+  if (!dataPromise) {
+    dataPromise = fetch(new URL("../game_data.json", import.meta.url),
+      { cache: "no-cache" }).then((r) => {
+      if (!r.ok) throw new Error("游戏数据加载失败");
+      return r.json();
+    }).catch((e) => {
+      dataPromise = null;                 // 失败允许重试
+      throw e;
+    });
+  }
+  return dataPromise;
+}
 
 export function getEngine() {
   if (!enginePromise) {
     enginePromise = (async () => {
-      const [highs, data] = await Promise.all([
-        loadHighs(),
-        fetch(new URL("../game_data.json", import.meta.url),
-          { cache: "no-cache" }).then((r) => {
-          if (!r.ok) throw new Error("游戏数据加载失败");
-          return r.json();
-        }),
-      ]);
+      const [highs, data] = await Promise.all([loadHighs(), getGameData()]);
       const engine = createEngine(data, makeSolver(highs));
       engine.buildings = data.buildings;
       return engine;
