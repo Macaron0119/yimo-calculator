@@ -1041,6 +1041,47 @@ $("#pin-rows").addEventListener("input", autoSave(persistPins));
   el.addEventListener("input", autoSave(saveSettings));
 });
 
+/* ---------------- 访问统计(GoatCounter) ----------------
+   注册 goatcounter.com 后: Settings→API→Create key(只勾 Read statistics),
+   把 site 与 token 填到下面, 并把 demo 改为 false 即启用真实数据 */
+const GOAT = {
+  site: "https://emilio.goatcounter.com",
+  token: "1cveakv36lx6w15i9um2hsbpcn14bu8woakh7wvd2igbmew3br4",
+};
+/* 总访问=全部浏览量; 当前在线=今日当前小时的访问量(API仅支持按小时) */
+async function goatFetch() {
+  try {
+    const r = await fetch(`${GOAT.site}/api/v0/stats/total?start=2000-01-01`,
+      { headers: { Authorization: `Bearer ${GOAT.token}` } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const today = new Date().toISOString().slice(0, 10);
+    const row = (d.stats || []).find((x) => x.day === today);
+    return { total: d.total || 0, hour: (row && row.hourly[new Date().getHours()]) || 0 };
+  } catch { return null; }
+}
+function renderStats(total, online) {
+  const bar = $("#stats-bar");
+  if (total == null && online == null) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  if (total != null) $("#st-total").textContent = total.toLocaleString("zh-CN");
+  if (online != null) $("#st-online").textContent = online.toLocaleString("zh-CN");
+}
+async function refreshStats() {
+  const d = await goatFetch();
+  renderStats(d ? d.total : null, d ? d.hour : null);
+}
+async function initAnalytics() {
+  if (!GOAT.site || !GOAT.token) return;
+  const sc = document.createElement("script");
+  sc.async = true;
+  sc.dataset.goatcounter = `${GOAT.site}/count`;
+  sc.src = "https://gc.zgo.at/count.v3.js";
+  document.head.appendChild(sc);
+  await refreshStats();
+  setInterval(refreshStats, 60000);
+}
+
 (async function init() {
   try {
     await refreshData();
@@ -1048,4 +1089,5 @@ $("#pin-rows").addEventListener("input", autoSave(persistPins));
   } catch (e) {
     showError("初始化失败: " + e.message);
   }
+  initAnalytics();
 })();

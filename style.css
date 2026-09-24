@@ -412,3 +412,11 @@ summary:hover { color: var(--primary-deep); text-decoration: underline; }
 }
 
 .g-seg.brief { font-size: .58rem; letter-spacing: 0; }
+
+/* ---------- 页面底部访问统计 ---------- */
+.stats-bar {
+  text-align: center; padding: 10px 0 20px;
+  font-size: .78rem; color: var(--muted);
+}
+.stats-bar b { color: var(--primary); font-weight: 650; font-variant-numeric: tabular-nums; }
+.stats-bar .sep { margin: 0 8px; opacity: .5; }
