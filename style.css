@@ -594,3 +594,8 @@ summary:hover { color: var(--primary-deep); text-decoration: underline; }
   .station-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   #yimo-search { width: auto; flex: 1; min-width: 120px; }
 }
+body {
+  font-size: 18px !important;
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif !important;
+  background: #f5f7fa !important;
+}
