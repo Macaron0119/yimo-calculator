@@ -1,4 +1,4 @@
-/* 伊莫家園生產計算器 前端邏輯(純前端: 本地引擎 + localStorage) */
+/* 伊莫家园生产计算器 前端逻辑(纯前端: 本地引擎 + localStorage) */
 import { getEngine, getGameData } from "./engine/client.js";
 import { store } from "./engine/store.js";
 
@@ -14,7 +14,7 @@ const fmt1 = (n) =>
   n == null || isNaN(n) ? "—" :
   Number(n).toLocaleString("zh-CN", { maximumFractionDigits: 1 });
 
-/* 高區分度配色: 相鄰色相/明度差異大, 白字對比均≥4.5:1 */
+/* 高区分度配色: 相邻色相/明度差异大, 白字对比度均≥4.5:1 */
 const PALETTE = ["#1D4ED8", "#C2410C", "#0F766E", "#7C3AED", "#BE185D",
   "#4D7C0F", "#92400E", "#0E7490", "#6D28D9", "#B91C1C", "#475569",
   "#A16207", "#15803D", "#86198F", "#9A3412", "#1E3A8A"];
@@ -24,7 +24,7 @@ const colorOf = (label) => {
     colorCache[label] = PALETTE[Object.keys(colorCache).length % PALETTE.length];
   return colorCache[label];
 };
-/* 背景色上用黑字還是白字(相對亮度) */
+/* 背景色上用黑字还是白字(相对亮度) */
 const inkOn = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -40,7 +40,7 @@ const state = {
   creatures: [], formLabels: {},
 };
 
-/* 與後端 unique_label 一致的配方顯示名(同名碰撞時高產版加"高速", 不顯示等級)*/
+/* 与后端 unique_label 一致的配方显示名(同名碰撞时高产版加"高速", 不显示等级) */
 function recipeLabel(r) {
   const sibs = state.recipes.filter((x) => x.building === r.building && x.name === r.name);
   if (new Set(sibs.map((x) => x.output_qty)).size < 2)
@@ -99,16 +99,16 @@ function recipesValue() {
   const v = $("#max-recipes").value;
   return v === "" ? null : parseInt(v, 10);
 }
-/* ---------------- 最優方案 ---------------- */
+/* ---------------- 最优方案 ---------------- */
 async function runOptimize() {
   const btn = $("#btn-run");
-  btn.disabled = true; btn.textContent = "計算中…";
+  btn.disabled = true; btn.textContent = "计算中…";
   showError("");
   try {
     let pinData;
     try { pinData = collectPinRows(); }
     catch (e) { showError(e.message); return; }
-    await new Promise((r) => setTimeout(r, 30));   // 讓"計算中"先渲染
+    await new Promise((r) => setTimeout(r, 30));   // 让"计算中"先渲染
     const engine = await getEngine();
     const result = await engine.optimize({
       level: levelValue(),
@@ -136,45 +136,45 @@ async function runOptimize() {
     renderFlows(result);
     renderExcluded(result);
   } catch (e) {
-    showError("計算失敗: " + e.message);
+    showError("计算失败: " + e.message);
   } finally {
-    btn.disabled = false; btn.textContent = "計算最優方案";
+    btn.disabled = false; btn.textContent = "计算最优方案";
   }
 }
 
 function renderOverview(r) {
   $("#ov-lp").textContent = fmt(r.total_lp);
   $("#ov-int").textContent = fmt(r.total_int);
-  $("#ov-int-k").textContent = r.lazy ? "懶人方案總價值" : "整數可行方案";
+  $("#ov-int-k").textContent = r.lazy ? "懒人方案总价值" : "整数可行方案";
   $("#ov-ratio").textContent = r.lazy
     ? (r.segments && r.segments.length > 1
-        ? `分 ${r.segments.length} 時段（統一切換）`
-        : switchValue() > 0 ? "未觸發切換（全程一種配方較優）" : "每個建築全程不換配方")
-    : `達成率 ${(r.ratio * 100).toFixed(2)}%（輪次取整後）`;
+        ? `分 ${r.segments.length} 个时段（统一切换）`
+        : switchValue() > 0 ? "未触发切换（全程一种配方更优）" : "每个建筑全程不换配方")
+    : `达成率 ${(r.ratio * 100).toFixed(2)}%（轮次取整后）`;
   const lazyDesc = r.lazy
-    ? ` · 懶人模式${switchValue() > 0 ? `(原料類最多換${switchValue()}次)` : ""}` +
+    ? ` · 懒人模式${switchValue() > 0 ? `(原料类最多换${switchValue()}次)` : ""}` +
       (recipesValue() ? ` · 原料类≤${recipesValue()}种` : "")
     : "";
   const effDesc = Object.keys(r.building_eff || {}).length
-    ? ` · 精細效率${Object.keys(r.building_eff).length}項` : "";
+    ? ` · 精细效率${Object.keys(r.building_eff).length}项` : "";
   const pinDesc = r.pins && r.pins.length
-    ? ` · 自訂${r.pins.length}項` : "";
+    ? ` · 自定义${r.pins.length}项` : "";
   $("#ov-cond").textContent =
-    `等級${r.level == null ? "不限" : r.level} · ${r.hours}h · ` +
-    `運作率${(r.work_coefficient * 100).toFixed(0)}%` +
-    `${$("#opt-use-seasonal").checked ? " · 含賽季配方" : ""}` +
+    `等级${r.level == null ? "不限" : r.level} · ${r.hours}h · ` +
+    `系数${(r.work_coefficient * 100).toFixed(0)}%` +
+    `${$("#opt-use-seasonal").checked ? " · 含赛季配方" : ""}` +
     lazyDesc + effDesc + pinDesc +
     `${Object.keys(r.stock || {}).length ? " · 含存量" : ""}`;
   $("#ov-kinds").textContent = r.sells.length;
   $("#ov-top").textContent = r.sells.length
-    ? `價值最高: ${r.sells[0].item} ${fmt(r.sells[0].value)}`
+    ? `价值最高: ${r.sells[0].item} ${fmt(r.sells[0].value)}`
     : "";
-  $("#ov-bn-k").textContent = "平均每小時淨利潤";
+  $("#ov-bn-k").textContent = "平均每小时净利润";
   $("#ov-bn").textContent = r.total_int ? fmt(r.total_int / r.hours) : "—";
-  $("#ov-bn2").textContent = `總淨利潤 ${fmt(r.total_int)} ÷ ${r.hours}h`;
+  $("#ov-bn2").textContent = `总净利润 ${fmt(r.total_int)} ÷ ${r.hours}h`;
 }
 
-/* 各產物淨利: 僅計實際出售的盈餘價值, 中間產物自耗不計收益 */
+/* 各产物净利润: 仅计实际出售的盈余价值, 中间产物自耗不计收益 */
 function netAgg(r) {
   return r.sells
     .map((s) => ({ label: s.item, qty: s.surplus,
@@ -182,20 +182,20 @@ function netAgg(r) {
     .sort((x, y) => y.net - x.net);
 }
 
-/* ---------------- 種植與生產安排 ---------------- */
+/* ---------------- 种植与生产安排 ---------------- */
 /* 秒 -> "40分钟" / "2分42秒" / "6小时46分" */
 function timeStr(sec) {
   sec = Math.round(sec);
   if (sec < 90) return `${sec}秒`;
   if (sec < 3600) {
     const m = Math.floor(sec / 60), s = sec % 60;
-    return s ? `${m}分${s}秒` : `${m}分鐘`;
+    return s ? `${m}分${s}秒` : `${m}分钟`;
   }
   const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
-  return m ? `${h}小時${m}分` : `${h}小時`;
+  return m ? `${h}小时${m}分` : `${h}小时`;
 }
 
-/* 種植類: 輪次拆成 "X塊×Y輪·Z時長" 的整數安排(每組並行, 各顯各自時長) */
+/* 种植类: 轮次拆成 "X块×Y轮·Z时长" 的整数安排(每组并行, 各显各自时长) */
 function growSplit(batches, cycles) {
   const full = Math.floor(batches / cycles);
   const rem = batches % cycles;
@@ -204,19 +204,19 @@ function growSplit(batches, cycles) {
   if (rem > 0) parts.push({ blocks: 1, cycles: rem });
   return { parts, slots: full + (rem > 0 ? 1 : 0) };
 }
-/* "8塊×36輪·24小時＋1塊×1輪·40分鐘" */
+/* "8块×36轮·24小时＋1块×1轮·40分钟" */
 function growPartsStr(g, timePerBatch) {
   return g.parts.map((pt) =>
-    `${pt.blocks}塊×${pt.cycles}轮·${timeStr(pt.cycles * timePerBatch)}`)
+    `${pt.blocks}块×${pt.cycles}轮·${timeStr(pt.cycles * timePerBatch)}`)
     .join("＋");
 }
-/* ---------------- 地塊甘特圖(田地/林地): 每塊地一行的時間軸 ---------------- */
+/* ---------------- 地块甘特图(田地/林地): 每块地一行的时间轴 ---------------- */
 const GANTT_BUILDINGS = new Set(["田地", "林地"]);
 
-/* 把方案輪次落到每塊地:
-   普通模式 —— 最少換茬貪心: 作物依計畫順序裝入"遊標最早"的地,
-   整塊裝滿, 零頭地由後續作物接續;
-   懶人分時段 —— 依各時段實例數直接分配, 同作物盡量黏在同一塊地 */
+/* 把方案轮次落到每块地上:
+   普通模式 —— 最少换茬贪心: 作物按计划顺序装入"游标最早"的地,
+   整块装满, 零头地由后续作物接续;
+   懒人分时段 —— 按各时段实例数直接分配, 同作物尽量粘在同一块地 */
 function ganttData(r, building) {
   const T = r.hours * 3600;
   const u = r.utilization.find(x => x.building === building);
@@ -229,7 +229,7 @@ function ganttData(r, building) {
       const items = seg.buildings[building] || [];
       const need = new Map(items.map(x => [x.label, x.instances]));
       if (items.reduce((sm, x) => sm + x.instances, 0) > count) return null;
-      for (const [label, idxs] of owner) {   // 回收多餘地塊
+      for (const [label, idxs] of owner) {   // 回收多余地块
         const keep = need.get(label) || 0;
         while (idxs.length > keep) idxs.pop();
       }
@@ -266,7 +266,7 @@ function ganttData(r, building) {
         if (T - rows[i].cursor < t) continue;
         if (best < 0 || rows[i].cursor < rows[best].cursor) best = i;
       }
-      if (best < 0) break;                 // 容差內放不下的尾差忽略
+      if (best < 0) break;                 // 容差内放不下的尾差忽略
       const take = Math.min(rem, Math.floor((T - rows[best].cursor) / t));
       const row = rows[best];
       row.segs.push({ label: it.label, from: row.cursor,
@@ -300,13 +300,13 @@ function renderGantt(r, building) {
       `<div class="g-track">${segs}</div></div>`;
   }).join("");
   const collapsed = g.count > 14;
-  return `<div class="gantt"><div class="g-head">${building} · ${g.count} 塊 · 逐塊時間軸` +
+  return `<div class="gantt"><div class="g-head">${building} · ${g.count} 块 · 逐块时间轴` +
     `<span class="hint">${r.segments && r.segments.length > 1
-      ? "以懶人分時段方案繪製" : "最少換茬的一種可行排布"}</span></div>` +
+      ? "按懒人分时段方案绘制" : "最少换茬的一种可行排布"}</span></div>` +
     `<div class="g-axis">${ticks.map(h =>
       `<span style="left:${h / r.hours * 100}%">${h % 1 ? (+h).toFixed(1) : h}h</span>`).join("")}</div>` +
     `<div class="g-rows${collapsed ? " collapsed" : ""}">${rowsHtml}</div>` +
-    `${collapsed ? `<button class="g-toggle" type="button">展開全部 ${g.count} 塊</button>` : ""}</div>`;
+    `${collapsed ? `<button class="g-toggle" type="button">展开全部 ${g.count} 块</button>` : ""}</div>`;
 }
 function bindGanttToggles(scope) {
   scope.querySelectorAll(".g-toggle").forEach(btn => {
@@ -323,16 +323,16 @@ function renderArrangement(r) {
   const T = r.hours * 3600;
 
   if (r.segments && r.segments.length > 1) {
-    // 分時段: 時間軸表格 (所有建築統一切換)
+    // 分时段: 时间线表格 (所有建筑统一切换)
     hint.textContent =
-      `懶人模式 · 全程分 ${r.segments.length} 時段，所有建築在 ` +
-      r.segments.slice(1).map((s) => `第 ${s.start_h} 小時`).join(" 和 ") + " 統一換配方。";
+      `懒人模式 · 全程分 ${r.segments.length} 个时段，所有建筑在 ` +
+      r.segments.slice(1).map((s) => `第 ${s.start_h} 小时`).join(" 和 ") + " 统一换配方。";
     const segs = r.segments;
     let html = "";
     for (const b of ["田地", "林地"]) html += renderGantt(r, b);
-    html += `<table class="seg-table"><thead><tr><th>建築</th>`;
+    html += `<table class="seg-table"><thead><tr><th>建筑</th>`;
     for (const s of segs)
-      html += `<th>${fmt1(s.start_h)} – ${fmt1(s.end_h)} 小時</th>`;
+      html += `<th>${fmt1(s.start_h)} – ${fmt1(s.end_h)} 小时</th>`;
     html += `</tr></thead><tbody>`;
     const bNames = [...new Set(segs.flatMap((s) => Object.keys(s.buildings)))];
     for (const b of bNames) {
@@ -343,23 +343,23 @@ function renderArrangement(r) {
         html += `<td>${items
           ? items.map((x) =>
               `<span style="white-space:nowrap"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${colorOf(x.label)}"></span>` +
-              `${x.label} <b>${x.instances}</b>${x.unit}·${fmt(x.batches)}輪</span>`).join("<br>")
-          : `<span class="hint">閒置</span>`}</td>`;
+              `${x.label} <b>${x.instances}</b>${x.unit}·${fmt(x.batches)}轮</span>`).join("<br>")
+          : `<span class="hint">闲置</span>`}</td>`;
       }
       html += `</tr>`;
     }
     html += `</tbody></table>`;
     html = `<div class="table-wrap">${html}</div>`;
-    // 製造類建築不受切換限制, 單獨列出
+    // 制造类建筑不受切换限制, 单独列出
     const flex = r.plan.filter((p) => p.flexible);
     if (flex.length) {
-      html += `<div class="mt arr-b"><div class="arr-head">製造類建築` +
-        `<span class="cap">材料到了就加工 · 全程靈活換配方</span></div>` +
+      html += `<div class="mt arr-b"><div class="arr-head">制造类建筑` +
+        `<span class="cap">材料到了就加工 · 全程灵活换配方</span></div>` +
         `<div class="arr-items">` +
         flex.map((p) =>
           `<span class="it"><span class="dot" style="background:${colorOf(p.label)}"></span>` +
           `<b>${p.seasonal ? "★" : ""}${p.building}·${p.label}</b> ` +
-          `${fmt(p.batches)}輪（單輪${timeStr(p.time_per_batch)}）</span>`).join("") +
+          `${fmt(p.batches)}轮（单轮${timeStr(p.time_per_batch)}）</span>`).join("") +
         `</div></div>`;
     }
     body.innerHTML = html;
@@ -367,12 +367,12 @@ function renderArrangement(r) {
     return;
   }
 
-  // 全程單段: 每建築比例條 + 整數口徑明細
+  // 全程单段: 每建筑比例条 + 整数口径明细
     hint.textContent = r.lazy
       ? (r.max_recipes
-        ? `原料建築最多 ${r.max_recipes === 1 ? "一" : r.max_recipes} 種產物，自訂生產不佔額；製造建築不限。`
-        : "原料建築每塊地全程一種產物；製造建築不限。")
-      : "如 9塊×18輪＋1塊×12輪：9 塊地各種 18 輪，另 1 塊種 12 輪。";
+        ? `原料建筑最多 ${r.max_recipes === 1 ? "一" : r.max_recipes} 种产物，自定义生产不占额；制造建筑不限。`
+        : "原料建筑每块地全程一种产物；制造建筑不限。")
+      : "如 9块×18轮＋1块×12轮：9 块地各种 18 轮，另 1 块种 12 轮。";
   const capBy = {};
   r.utilization.forEach((u) => (capBy[u.building] = u.cap));
   const order = [...r.utilization].sort((a, b) => b.pct - a.pct);
@@ -384,7 +384,7 @@ function renderArrangement(r) {
     const ps = byB[u.building];
     if (!ps || !ps.length) continue;
     html += `<div class="arr-b"><div class="arr-head">${u.building}` +
-      `<span class="cap">${u.count} ${ps[0].unit === "地塊" ? "塊田" : "座"} · ` +
+      `<span class="cap">${u.count} ${ps[0].unit === "地块" ? "块田" : "座"} · ` +
       `利用率 ${(u.pct * 100).toFixed(0)}%</span></div>`;
     if (GANTT_BUILDINGS.has(u.building))
       html += renderGantt(r, u.building);
@@ -392,7 +392,7 @@ function renderArrangement(r) {
     for (const p of ps) {
       const share = Math.min(1, (p.batches_int * p.time_per_batch) / (capBy[u.building] || 1));
       if (share <= 0.0005) continue;
-      const slotsInt = p.ttype === "生長"
+      const slotsInt = p.ttype === "生长"
         ? growSplit(p.batches_int, Math.floor(T / p.time_per_batch)).slots
         : (p.flexible || p.slots == null ? null : Math.max(1, Math.round(p.slots || 1)));
       const bg = colorOf(p.label);
@@ -406,18 +406,18 @@ function renderArrangement(r) {
     for (const p of ps) {
       if (!p.flexible && p.batches_int <= 0) continue;
       let txt;
-      if (p.ttype === "生長") {
+      if (p.ttype === "生长") {
         const cycles = Math.floor(T / p.time_per_batch);
         const g = growSplit(p.batches_int, cycles);
-        txt = `${growPartsStr(g, p.time_per_batch)}（每轮${timeStr(p.time_per_batch)}，共${fmt(p.batches_int)}輪）`;
+        txt = `${growPartsStr(g, p.time_per_batch)}（每轮${timeStr(p.time_per_batch)}，共${fmt(p.batches_int)}轮）`;
       } else if (p.chain) {
-        txt = `${fmt(p.batches)}輪（單輪${timeStr(p.time_per_batch)}，加工鏈環節）`;
+        txt = `${fmt(p.batches)}轮（单轮${timeStr(p.time_per_batch)}，加工链环节）`;
       } else if (p.flexible) {
-        txt = `${fmt(p.batches)}輪（單輪${timeStr(p.time_per_batch)}，` +
-          `累計${timeStr(p.batches * p.time_per_batch)}，按材質靈活換配方）`;
+        txt = `${fmt(p.batches)}轮（单轮${timeStr(p.time_per_batch)}，` +
+          `累计${timeStr(p.batches * p.time_per_batch)}，按材料灵活换配方）`;
       } else {
-        txt = `${fmt(p.batches_int)}輪（單輪${timeStr(p.time_per_batch)}，` +
-          `累計${timeStr(p.batches_int * p.time_per_batch)}` +
+        txt = `${fmt(p.batches_int)}轮（单轮${timeStr(p.time_per_batch)}，` +
+          `累计${timeStr(p.batches_int * p.time_per_batch)}` +
           `${r.lazy ? `，峰值${fmt(p.slots)}座` : ""}）`;
       }
       html += `<span class="it"><span class="dot" style="background:${colorOf(p.label)}"></span>` +
@@ -426,11 +426,11 @@ function renderArrangement(r) {
     html += `</div></div>`;
   }
   body.innerHTML = html ||
-    `<div class="hint">在當前條件下沒有需要安排的生產。</div>`;
+    `<div class="hint">当前条件下没有需要安排的生产。</div>`;
   bindGanttToggles(body);
 }
 
-/* ---------------- 圖表 ---------------- */
+/* ---------------- 图表 ---------------- */
 function renderSellChart(r) {
   chart("chart-sell").setOption({
     color: PALETTE,
@@ -447,7 +447,7 @@ function renderSellChart(r) {
   }, true);
 }
 
-/* 橫向長條圖通用繪製(產物淨利) */
+/* 横向条形图通用绘制(产物净利润) */
 function renderHBar(elId, rows, valueKey) {
   const el = $("#" + elId);
   el.style.height = Math.max(300, rows.length * 28 + 46) + "px";
@@ -456,8 +456,8 @@ function renderHBar(elId, rows, valueKey) {
   el.__chart.setOption({
     tooltip: { trigger: "item", formatter: (p) => {
       const d = rows[p.dataIndex];
-      return `<b>${d.label}</b><br/>淨利潤 ${fmt(d.net)}<br/>` +
-        `每小時 ${fmt(d.perHour)}<br/>出售 ${fmt(d.qty)}`;
+      return `<b>${d.label}</b><br/>净利润 ${fmt(d.net)}<br/>` +
+        `每小时 ${fmt(d.perHour)}<br/>出售 ${fmt(d.qty)}`;
     } },
     grid: { left: 8, right: 78, top: 6, bottom: 4, containLabel: true },
     xAxis: { type: "value",
@@ -478,19 +478,19 @@ function renderHBar(elId, rows, valueKey) {
   });
 }
 
-/* 數值緊湊格式: 34.5萬 / 1,234 */
+/* 数值紧凑格式: 34.5万 / 1,234 */
 function fmtCompact(v) {
   v = Number(v);
   if (Math.abs(v) >= 10000)
-    return (v / 10000).toFixed(v % 10000 === 0 ? 0 : 1) + "萬";
+    return (v / 10000).toFixed(v % 10000 === 0 ? 0 : 1) + "万";
   return v.toLocaleString("zh-CN");
 }
 
 function renderNetChart(r) {
   const rows = netAgg(r).reverse();          // 倒序供横向条形自下而上
   $("#net-title").innerHTML =
-    `產物淨利潤（${r.hours} 小時內）` +
-    `<span class="hint">只計實際賣出的部分，自用材料不計</span>`;
+    `产物净利润（${r.hours} 小时内）` +
+    `<span class="hint">只计实际卖出的部分，自用材料不计</span>`;
   renderHBar("chart-net", rows, "net");
 }
 
@@ -507,8 +507,8 @@ function renderRankChart() {
       const r = rows[p.dataIndex];
       const mats = (r.materials || []).map((m) =>
         `${m.item}×${m.qty ?? "?"}（${fmt(m.cost)}）`).join("<br/>");
-      return `<b>${r.label}</b>（${r.building}）<br/>净收益 ${fmt(r.net_per_hour)}/小時` +
-        `<br/>單輪淨收益 ${fmt(r.net)} · ${fmt1(r.time)}s<br/>材料：<br>${mats || "無"}`;
+      return `<b>${r.label}</b>（${r.building}）<br/>净收益 ${fmt(r.net_per_hour)}/小时` +
+        `<br/>单轮净收益 ${fmt(r.net)} · ${fmt1(r.time)}s<br/>材料：<br>${mats || "无"}`;
     } },
     grid: { left: 6, right: 72, top: 8, bottom: 2, containLabel: true },
     xAxis: { type: "value",
@@ -528,7 +528,7 @@ function renderRankChart() {
   }, true);
 }
 
-/* ---------------- 方案明細表 ---------------- */
+/* ---------------- 方案明细表 ---------------- */
 function renderPlanTable(r) {
   const tbody = $("#plan-table tbody");
   const groups = new Map();
@@ -544,21 +544,21 @@ function renderPlanTable(r) {
     if (!ps || !ps.length) continue;
     const u = r.utilization.find((x) => x.building === b);
     html += `<tr class="group"><td colspan="6">${b}（${u.count}座）　利用率 ` +
-      `<b>${(u.pct * 100).toFixed(0)}%</b>${u.idle ? "　閒置" : ""}</td></tr>`;
+      `<b>${(u.pct * 100).toFixed(0)}%</b>${u.idle ? "　闲置" : ""}</td></tr>`;
     for (const p of ps) {
       let occupy;
       if (p.chain) {
-        occupy = `累计${timeStr(p.batches * p.time_per_batch)} · 加工鏈`;
+        occupy = `累计${timeStr(p.batches * p.time_per_batch)} · 加工链`;
       } else if (p.flexible) {
-        occupy = `累計${timeStr(p.batches * p.time_per_batch)} · 彈性換配方`;
-      } else if (p.ttype === "生長" && !r.segments) {
+        occupy = `累计${timeStr(p.batches * p.time_per_batch)} · 灵活换配方`;
+      } else if (p.ttype === "生长" && !r.segments) {
         occupy = growPartsStr(
           growSplit(p.batches_int, Math.floor(r.hours * 3600 / p.time_per_batch)),
           p.time_per_batch);
       } else if (r.segments) {
         occupy = `峰值${fmt(p.slots)}${p.unit}`;
       } else {
-        occupy = `累計${timeStr(p.batches_int * p.time_per_batch)}` +
+        occupy = `累计${timeStr(p.batches_int * p.time_per_batch)}` +
           (r.lazy ? ` · 峰值${fmt(p.slots)}座` : "");
       }
       html += `<tr><td></td>` +
@@ -570,7 +570,7 @@ function renderPlanTable(r) {
     }
   }
   tbody.innerHTML = html ||
-    `<tr><td colspan="6" style="text-align:center;color:#64748B">無可用方案</td></tr>`;
+    `<tr><td colspan="6" style="text-align:center;color:#64748B">无可用方案</td></tr>`;
 }
 
 function renderFlows(r) {
@@ -599,15 +599,15 @@ function renderExcluded(r) {
     : "<span style='background:#F1EDFB;color:#57449F;border-color:#D9D0F2'>无</span>";
 }
 
-/* ---------------- 存量資源 ---------------- */
-/* 與自訂生產一致: 待填虛線 / 已填實線高亮, 填完最後一行自動追加空白行 */
+/* ---------------- 存量资源 ---------------- */
+/* 与自定义生产一致: 待填虚线 / 已填实线高亮, 填完最后一行自动追加空白行 */
 function stockRow(item = "", qty = "") {
   const div = document.createElement("div");
   div.className = "stock-row";
   div.innerHTML =
-    `<input class="s-item" list="item-names" value="${item}" placeholder="資源名稱" aria-label="資源名稱">` +
-    `<input class="s-qty" type="number" min="0" value="${qty}" placeholder="數量" aria-label="數量">` +
-    `<button class="ghost" type="button" title="刪除此行">×</button>`;
+    `<input class="s-item" list="item-names" value="${item}" placeholder="资源名称" aria-label="资源名称">` +
+    `<input class="s-qty" type="number" min="0" value="${qty}" placeholder="数量" aria-label="数量">` +
+    `<button class="ghost" type="button" title="删除此行">×</button>`;
   const iItem = div.querySelector(".s-item");
   const iQty = div.querySelector(".s-qty");
   const updateFilled = () =>
@@ -630,7 +630,7 @@ function renderStockRows() {
   box.innerHTML = "";
   for (const [item, qty] of Object.entries(state.stock))
     box.appendChild(stockRow(item, qty));
-  box.appendChild(stockRow());                    // 始終留一行空白便於錄入
+  box.appendChild(stockRow());                    // 始终留一行空白便于录入
   $("#stock-status").textContent = Object.keys(state.stock).length
     ? `已保存 ${Object.keys(state.stock).length} 项存量` : "暂无保存的存量";
 }
@@ -649,8 +649,8 @@ function persistStock() {
   state.stock = collectStockRows();
   store.save({ stock: state.stock });
   $("#stock-status").textContent = Object.keys(state.stock).length
-    ? `已存 ${Object.keys(state.stock).length} 項（本機自動儲存）`
-    : "已清空（本機自動儲存）";
+    ? `已存 ${Object.keys(state.stock).length} 项（本机自动保存）`
+    : "已清空（本机自动保存）";
 }
 
 function renderStockUsed(r) {
@@ -662,27 +662,27 @@ function renderStockUsed(r) {
   }
   entries.sort((a, b) => b[1].value - a[1].value);
   const total = entries.reduce((s, [, v]) => s + v.value, 0);
-  el.innerHTML = `<b>本方案動用存量：</b>` +
+  el.innerHTML = `<b>本方案动用存量：</b>` +
     entries.map(([it, v]) => `${it} ×${fmt(v.qty)}`).join("、") +
-    `　<span class="hint">（價值 ${fmt(total)}）</span>`;
+    `　<span class="hint">（价值 ${fmt(total)}）</span>`;
   el.classList.remove("hidden");
 }
 
-/* ---------------- 自訂生產(填入即生效) ---------------- */
-/* 新行以佔位符開始(虛線待填樣式), 選好建築+產物後變成已新增樣式 */
+/* ---------------- 自定义生产(填入即生效) ---------------- */
+/* 新行以占位符开始(虚线待填样式), 选好建筑+产物后变为已添加样式 */
 function pinRow(building = "", recipeId = "", n = "") {
   const div = document.createElement("div");
   div.className = "pin-row";
-  const bOpts = `<option value=""${building ? "" : " selected"} disabled>選擇建築…</option>` +
+  const bOpts = `<option value=""${building ? "" : " selected"} disabled>选择建筑…</option>` +
     state.buildings.map((b) =>
       `<option${b.name === building ? " selected" : ""}>${b.name}</option>`).join("");
   div.innerHTML =
-    `<select class="p-building" aria-label="自訂建築">${bOpts}</select>` +
-    `<select class="p-recipe" aria-label="自訂產物">` +
+    `<select class="p-building" aria-label="自定义建筑">${bOpts}</select>` +
+    `<select class="p-recipe" aria-label="自定义产物">` +
     `<option value="" disabled selected>选择产物…</option></select>` +
     `<input class="p-n" type="number" min="1" placeholder="全部" value="${n}" ` +
-    `title="留空＝整棟建築；填數字＝保底幾個實例" aria-label="自訂數量">` +
-    `<button class="ghost" type="button" title="刪除此行">×</button>`;
+    `title="留空＝整个建筑；填数字＝保底几个实例" aria-label="自定义数量">` +
+    `<button class="ghost" type="button" title="删除此行">×</button>`;
   const bSel = div.querySelector(".p-building");
   const rSel = div.querySelector(".p-recipe");
   let curRid = recipeId;
@@ -690,12 +690,12 @@ function pinRow(building = "", recipeId = "", n = "") {
     div.classList.toggle("filled", !!(bSel.value && rSel.value));
   const fillRecipes = () => {
     const rs = state.recipes.filter((r) => r.building === bSel.value);
-    rSel.innerHTML = `<option value=""${curRid ? "" : " selected"} disabled>選擇產物…</option>` +
+    rSel.innerHTML = `<option value=""${curRid ? "" : " selected"} disabled>选择产物…</option>` +
       rs.map((r) => `<option value="${r.id}"${r.id == curRid ? " selected" : ""}>` +
         `${recipeLabel(r)}</option>`).join("");
     updateFilled();
   };
-  const autoGrow = () => {            // 填完最後一行時自動追加一行空白
+  const autoGrow = () => {            // 填完最后一行时自动追加一行空白
     if (div.classList.contains("filled") &&
         div === $("#pin-rows").lastElementChild)
       $("#pin-rows").appendChild(pinRow());
@@ -712,43 +712,43 @@ function renderPinRows() {
   box.innerHTML = "";
   for (const p of state.pins)
     box.appendChild(pinRow(p.building, p.recipe_id, p.n ?? ""));
-  box.appendChild(pinRow());                   //留一行空白方便新增
+  box.appendChild(pinRow());                   // 留一行空白便于新增
   $("#pin-status").textContent = state.pins.length
-    ? `已保存 ${state.pins.length} 項：` + state.pins.map((p) => {
+    ? `已保存 ${state.pins.length} 项：` + state.pins.map((p) => {
         const r = state.recipes.find((x) => x.id === p.recipe_id);
         return `${p.building}→${r ? recipeLabel(r) : "?"}${p.n ? `×${p.n}` : ""}`;
       }).join("、")
     : "";
 }
 
-/* 面板目前內容的即時收集(計算時直接生效, 保存僅持久化);
-   同建築可多項部分自訂, 實例合計不得超過建築數量 */
+/* 面板当前内容的即时收集(计算时直接生效, 保存仅持久化);
+   同建筑可多项部分自定义, 实例合计不得超过建筑数量 */
 function collectPinRows() {
   const pins = [];
   const sum = {}, whole = {}, seen = new Set();
   $$("#pin-rows .pin-row").forEach((row) => {
     const b = row.querySelector(".p-building").value;
     const rid = parseInt(row.querySelector(".p-recipe").value, 10);
-    if (!b || isNaN(rid)) return;              // 未填寫的行跳過
+    if (!b || isNaN(rid)) return;              // 未填写的行跳过
     const key = `${b}#${rid}`;
     if (seen.has(key)) {
       const r = state.recipes.find((x) => x.id === rid);
-      throw new Error(`自訂生產重複：${b}·${r ? recipeLabel(r) : rid}`);
+      throw new Error(`自定义生产重复：${b}·${r ? recipeLabel(r) : rid}`);
     }
     seen.add(key);
     const cnt = state.buildings.find((x) => x.name === b)?.count ?? 1;
     const nv = parseInt(row.querySelector(".p-n").value, 10);
     const hasN = !isNaN(nv) && nv >= 1;
-    if (!hasN) {                               // 整建築全力
+    if (!hasN) {                               // 整建筑全力
       if (whole[b] || sum[b])
-        throw new Error(`${b} 已有整建築自訂項，不能再疊加其他項`);
+        throw new Error(`${b} 已有整建筑自定义项，不能再叠加其他项`);
       whole[b] = true;
-    } else {                                   // 部分自訂
+    } else {                                   // 部分自定义
       if (whole[b])
-        throw new Error(`${b} 已有整建築自訂項，不能再疊加其他項`);
+        throw new Error(`${b} 已有整建筑自定义项，不能再叠加其他项`);
       sum[b] = (sum[b] || 0) + nv;
       if (sum[b] > cnt)
-        throw new Error(`${b} 的自訂實例合計 ${sum[b]}，超過擁有數量 ${cnt}`);
+        throw new Error(`${b} 的自定义实例合计 ${sum[b]}，超过拥有数量 ${cnt}`);
     }
     pins.push({ building: b, recipe_id: rid, ...(hasN ? { n: nv } : {}) });
   });
@@ -776,10 +776,10 @@ function persistPins() {
     return { building: p.building, product: r ? r.name : "", n: p.n };
   }) });
   $("#pin-status").textContent = pins.length
-    ? `已設 ${pins.length} 项：` + pins.map((p) => {
+    ? `已设 ${pins.length} 项：` + pins.map((p) => {
         const r = state.recipes.find((x) => x.id === p.recipe_id);
         return `${p.building}→${r ? recipeLabel(r) : "?"}${p.n ? `×${p.n}` : ""}`;
-      }).join("、") + "（本機自動儲存）"
+      }).join("、") + "（本机自动保存）"
     : "";
   showError("");
 }
@@ -793,15 +793,15 @@ function renderPinUsed(r) {
     el.classList.add("hidden");
     return;
   }
-  el.innerHTML = `<b>自訂生產：</b>` +
+  el.innerHTML = `<b>自定义生产：</b>` +
     r.pins.map((p) => `${p.building} → ${p.label}${p.n ? ` ×${p.n}（部分）` : ""}`).join("、") +
     `　<span class="hint">（${r.pins.some((p) => p.n)
-      ? "保底產能，其餘自由安排" : "整棟建築只做這個"}）</span>`;
+      ? "保底产能，其余自由安排" : "整个建筑只做这个"}）</span>`;
   el.classList.remove("hidden");
 }
 
 
-/* ---------------- 產物收益 ---------------- */
+/* ---------------- 产物收益 ---------------- */
 async function loadProducts() {
   const engine = await getEngine();
   state.products = await engine.productAnalysis({
@@ -822,7 +822,7 @@ function renderProducts() {
 
   let rows = state.products.map((p) => ({
     ...p,
-    matstr: (p.seed_price ? `種子${fmt(p.seed_price)}、` : "") +
+    matstr: (p.seed_price ? `种子${fmt(p.seed_price)}、` : "") +
       (p.materials || []).map((m) => `${m.item}×${m.qty ?? "?"}`).join("、"),
   }));
   if (bfilter) rows = rows.filter((p) => p.building === bfilter);
@@ -861,7 +861,7 @@ function renderProducts() {
       `<td class="matlist" title="${matTip.replace(/"/g, "&quot;")}">${p.matstr || "—"}</td>` +
       `</tr>`;
   }).join("") ||
-    `<tr><td colspan="12" style="text-align:center;color:#64748B">沒有匹配的產物</td></tr>`;
+    `<tr><td colspan="12" style="text-align:center;color:#64748B">没有匹配的产物</td></tr>`;
 
   $$("#prod-table thead th").forEach((th) => {
     th.classList.toggle("sorted", th.dataset.k === k);
@@ -870,15 +870,15 @@ function renderProducts() {
   });
 }
 
-/* ---------------- 資料管理 ---------------- */
+/* ---------------- 数据管理 ---------------- */
 function renderBuildingEditor() {
   $("#building-editor").innerHTML = state.buildings.map((b) =>
     `<label>${b.name}<input data-b="${b.name}" type="number" min="0" ` +
-    `value="${b.count ?? 1}" aria-label="${b.name}數量"></label>`).join("");
+    `value="${b.count ?? 1}" aria-label="${b.name}数量"></label>`).join("");
   const opts = state.buildings.map((b) =>
     `<option value="${b.name}">${b.name}</option>`).join("");
   $("#f-building").innerHTML =
-    `<option value="">全部建築</option>` + opts;
+    `<option value="">全部建筑</option>` + opts;
 }
 
 async function refreshData() {
@@ -906,7 +906,7 @@ async function refreshData() {
   renderEffRows();
   renderPinRows();
   $("#stock-status").textContent = Object.keys(state.stock).length
-    ? `已存 ${Object.keys(state.stock).length} 項（本機）` : "";
+    ? `已存 ${Object.keys(state.stock).length} 项（本机）` : "";
   const names = [...new Set(state.recipes.flatMap((r) =>
     [r.name, r.extra_product, ...r.inputs.map((i) => i.item)].filter(Boolean)))]
     .sort((a, b) => a.localeCompare(b, "zh"));
@@ -915,9 +915,9 @@ async function refreshData() {
   initYimo();
 }
 
-/* ---------------- 本機設定恢復/自動儲存 ---------------- */
+/* ---------------- 本机设置恢复/自动保存 ---------------- */
 function restoreSettings(s) {
-  if (s.level == null && !s.mig10) {     // 一次性遷移: 預設等級10
+  if (s.level == null && !s.mig10) {     // 一次性迁移: 默认等级10
     s.level = 10;
     s.mig10 = true;
     store.save({ settings: s });
@@ -949,7 +949,7 @@ function saveSettings() {
   } });
 }
 
-/* ---------------- 事件綁定與初始化 ---------------- */
+/* ---------------- 事件绑定与初始化 ---------------- */
 $("#btn-run").addEventListener("click", async () => {
   await Promise.all([runOptimize(), loadProducts()]);
 });
@@ -962,7 +962,7 @@ function syncLazyControls() {
   $("#sw-wrap").classList.toggle("hidden", !on);
   $("#sw2-wrap").classList.toggle("hidden", !on);
   const uniform = $("#max-recipes").value === "1";
-  $("#max-switch").disabled = uniform;        // 整齊劃一時切換無意義
+  $("#max-switch").disabled = uniform;        // 整齐划一时切换无意义
   if (uniform) $("#max-switch").value = "0";
 }
 $("#opt-lazy").addEventListener("change", syncLazyControls);
@@ -977,7 +977,7 @@ $("#btn-stock-add").addEventListener("click", () =>
   $("#stock-rows").appendChild(stockRow()));
 
 /* ---------------- 工作效率(填入即生效) ---------------- */
-/* 已填入效率的建築高亮顯示, 區別於跟隨全域係數的預設項 */
+/* 已填入效率的建筑高亮显示, 区别于跟随全局系数的默认项 */
 function renderEffRows() {
   const wl = [...new Set(state.recipes
     .filter((r) => r.workload != null).map((r) => r["building"]))]
@@ -994,17 +994,17 @@ function renderEffRows() {
     i.addEventListener("input", () =>
       i.closest(".eff-cell").classList.toggle("filled", i.value !== "")));
   $("#eff-status").textContent = Object.keys(state.buildingEff).length
-    ? `已保存 ${Object.keys(state.buildingEff).length} 項覆蓋（${Object.entries(state.buildingEff)
+    ? `已保存 ${Object.keys(state.buildingEff).length} 项覆盖（${Object.entries(state.buildingEff)
         .map(([b, e]) => `${b} ${Math.round(e * 100)}%`).join("、")}）`
-    : "其餘建築跟隨全域係數";
+    : "其余建筑跟随全局系数";
 }
 
 function persistEff() {
   state.buildingEff = collectEffRows();
   store.save({ eff: state.buildingEff });
   $("#eff-status").textContent = Object.keys(state.buildingEff).length
-    ? `已設 ${Object.keys(state.buildingEff).length} 項（本機自動儲存）`
-    : "其餘建築跟隨全域係數";
+    ? `已设 ${Object.keys(state.buildingEff).length} 项（本机自动保存）`
+    : "其余建筑跟随全局系数";
 }
 
 
@@ -1023,7 +1023,7 @@ $$("#prod-table thead th").forEach((th) => {
   });
 });
 
-/* 本機自動保存(去抖 350ms): 建築數量/存量/效率/自訂/頂部設置 */
+/* 本机自动保存(去抖 350ms): 建筑数量/存量/效率/自定义/顶部设置 */
 let saveTimer = null;
 const autoSave = (fn) => () => {
   clearTimeout(saveTimer);
@@ -1033,7 +1033,7 @@ let recomputeTimer = null;
 $("#building-editor").addEventListener("input", autoSave(() => {
   persistCounts();
   clearTimeout(recomputeTimer);
-  recomputeTimer = setTimeout(() => runOptimize(), 800);  // 數量變化自動重算
+  recomputeTimer = setTimeout(() => runOptimize(), 800);  // 数量变化自动重算
 }));
 $("#stock-rows").addEventListener("input", autoSave(persistStock));
 $("#eff-rows").addEventListener("input", autoSave(persistEff));
@@ -1046,59 +1046,59 @@ $("#pin-rows").addEventListener("input", autoSave(persistPins));
   el.addEventListener("input", autoSave(saveSettings));
 });
 
-/* ================= 伊莫圖鑑 tab ================= */
-/* 能力ID -> 展示名(庫內為 wiki 原名: 岩/割除/特殊/採香產香) */
+/* ================= 伊莫图鉴 tab ================= */
+/* 能力ID -> 展示名(库内为 wiki 原名: 岩/割除/特殊/采香产香) */
 const ABILITY_NAMES = {
-  1000: "火", 1001: "草", 1002: "水", 1003: "土", 1004: "電", 1005: "冰",
-  1006: "風", 1007: "暗", 1008: "光", 1100: "搬運", 1101: "手工",
-  1102: "遊玩", 1103: "調香",
+  1000: "火", 1001: "草", 1002: "水", 1003: "土", 1004: "电", 1005: "冰",
+  1006: "风", 1007: "暗", 1008: "光", 1100: "搬运", 1101: "手工",
+  1102: "游玩", 1103: "制香",
 };
-/* 伊莫屬性展示名: 庫內"岩石"遊戲內叫"土" */
+/* 伊莫属性展示名: 库内"岩"游戏内叫"土" */
 const EL_DISPLAY = { "岩": "土" };
 const elName = (e) => EL_DISPLAY[e] || e;
-/* 屬性 -> 元素能力ID(取對應圖示, 職位屬性條件折算成能力篩選) */
+/* 属性 -> 元素能力ID(取对应图标, 岗位属性条件折算成能力筛选) */
 const EL_ABID = {
-  "火": 1000, "草": 1001, "水": 1002, "岩": 1003, "電": 1004,
-  "冰": 1005, "風": 1006, "暗": 1007, "光": 1008,
+  "火": 1000, "草": 1001, "水": 1002, "岩": 1003, "电": 1004,
+  "冰": 1005, "风": 1006, "暗": 1007, "光": 1008,
 };
 const abIcon = (id) => `./icons/${id}.png`;
-const STAGE_NAMES = { "1": "新生期", "2": "成長期", "3": "成熟期" };
+const STAGE_NAMES = { "1": "新生期", "2": "成长期", "3": "成熟期" };
 
-/* 家族=進化鏈成員編號(供職推薦"XX家族"篩選) */
+/* 家族=进化链成员编号(供岗位推荐"XX家族"筛选) */
 const FAMILY_SERIALS = {
-  "雲朵羊": ["017", "018", "019"],           // 雲朵羊/蓬蓬羊/眠眠羊
-  "羞羞獺": ["049", "050", "051", "052"],    // 羞羞獺/泡泡獺/漂漂獺/胖胖獺
-  "採蜜鳥": ["038", "039"],                  // 採蜜鳥/香氛鳥
+  "云朵羊": ["017", "018", "019"],           // 云朵羊/蓬蓬羊/眠眠羊
+  "羞羞獭": ["049", "050", "051", "052"],    // 羞羞獭/泡泡獭/漂漂獭/胖胖獭
+  "采蜜鸟": ["038", "039"],                  // 采蜜鸟/香氛鸟
 };
 
-/* 建築崗位條件: mbti 為後天養成性格(僅展示); kind/v 為可篩選的先天條件
-   (element 的 v 以庫內屬性值, 展示時經 elName 轉換) */
+/* 建筑岗位条件: mbti 为后天养成性格(仅展示); kind/v 为可筛选的先天条件
+   (element 的 v 用库内属性值, 展示时经 elName 转换) */
 const STATION_TRAITS = {
-  "礦山":         { mbti: "P", kind: "element", v: "岩", text: "土屬性" },
-  "煙囪煅燒爐":   { mbti: "S", kind: "element", v: "火", text: "火屬性" },
-  "木工台":       { mbti: "E", kind: "ability", v: 1101, text: "手工屬性" },
-  "綿雲草床":     { mbti: "J", kind: "family",  v: "云朵羊", text: "雲朵羊家族" },
-  "汐語沙堡":     { mbti: "J", kind: "family",  v: "羞羞獭", text: "羞羞獺家族" },
-  "採蜜鳥屋":     { mbti: "I", kind: "family",  v: "採蜜鳥", text: "採蜜鳥家族", icon: 1103 },
-  "水井":         { mbti: "F", kind: "element", v: "水", text: "水屬性" },
-  "手作台":       { mbti: "J", kind: "ability", v: 1101, text: "手工屬性" },
-  "旋轉木馬磨坊": { mbti: "T", kind: "element", v: "风", text: "風屬性" },
-  "摩天輪紡車":   { mbti: "F", kind: "element", v: "风", text: "風屬性" },
-  "風味淹漬罐":   { mbti: "P", kind: "element", v: "暗", text: "暗屬性" },
-  "超旺爐灶":     { mbti: "N", kind: "element", v: "火", text: "火屬性" },
-  "蹦蹦釀造桶":   { mbti: "E", kind: "element", v: "水", text: "水屬性" },
-  "音樂烘乾機":   { mbti: "N", kind: "element", v: "暗", text: "暗屬性" },
-  "熬煮鍋":       { mbti: "T", kind: "element", v: "火", text: "火屬性" },
-  "留聲調香台":   { mbti: "I", kind: "family",  v: "採蜜鳥", text: "採蜜鳥家族", icon: 1103 },
-  "抓抓烹飪爐":   { mbti: "S", kind: "element", v: "火", text: "火屬性" },
-  /* 庫外建築(暫無配方資料): 僅出現在崗位推薦, 無性格要求 */
-  "日光燈":       { mbti: "",  kind: "element", v: "光", text: "光屬性" },
-  "熱能爐":       { mbti: "",  kind: "element", v: "火", text: "火屬性" },
-  "製冷機":       { mbti: "",  kind: "element", v: "冰", text: "冰屬性" },
+  "矿山":         { mbti: "P", kind: "element", v: "岩", text: "土属性" },
+  "烟囱煅烧炉":   { mbti: "S", kind: "element", v: "火", text: "火属性" },
+  "木工台":       { mbti: "E", kind: "ability", v: 1101, text: "手工属性" },
+  "绵云草床":     { mbti: "J", kind: "family",  v: "云朵羊", text: "云朵羊家族" },
+  "汐语沙堡":     { mbti: "J", kind: "family",  v: "羞羞獭", text: "羞羞獭家族" },
+  "采蜜鸟屋":     { mbti: "I", kind: "family",  v: "采蜜鸟", text: "采蜜鸟家族", icon: 1103 },
+  "水井":         { mbti: "F", kind: "element", v: "水", text: "水属性" },
+  "手作台":       { mbti: "J", kind: "ability", v: 1101, text: "手工属性" },
+  "旋转木马磨坊": { mbti: "T", kind: "element", v: "风", text: "风属性" },
+  "摩天轮纺车":   { mbti: "F", kind: "element", v: "风", text: "风属性" },
+  "风味腌制罐":   { mbti: "P", kind: "element", v: "暗", text: "暗属性" },
+  "超旺灶台":     { mbti: "N", kind: "element", v: "火", text: "火属性" },
+  "蹦蹦酿造桶":   { mbti: "E", kind: "element", v: "水", text: "水属性" },
+  "音乐烘干机":   { mbti: "N", kind: "element", v: "暗", text: "暗属性" },
+  "熬制锅":       { mbti: "T", kind: "element", v: "火", text: "火属性" },
+  "留声制香台":   { mbti: "I", kind: "family",  v: "采蜜鸟", text: "采蜜鸟家族", icon: 1103 },
+  "抓夹烹饪炉":   { mbti: "S", kind: "element", v: "火", text: "火属性" },
+  /* 库外建筑(暂无配方数据): 仅出现在岗位推荐, 无性格要求 */
+  "日光灯":       { mbti: "",  kind: "element", v: "光", text: "光属性" },
+  "热能炉":       { mbti: "",  kind: "element", v: "火", text: "火属性" },
+  "制冷机":       { mbti: "",  kind: "element", v: "冰", text: "冰属性" },
 };
 const MBTI_DESC = {
-  E: "外向", I: "内向", S: "實際", N: "靈性",
-  T: "冷酷", F: "貼心", J: "聽話", P: "隨性",
+  E: "外向", I: "内向", S: "实感", N: "直觉",
+  T: "思考", F: "情感", J: "条理", P: "随性",
 };
 
 const yimoFilter = {
@@ -1107,10 +1107,10 @@ const yimoFilter = {
 };
 let yimoReady = false;
 
-/* 頁籤切換: 品牌名稱/頁面標題隨頁籤變化 */
+/* 页签切换: 品牌名/页面标题随页签变化 */
 const TAB_TITLES = {
-  calc: "伊莫·家園生產計算",
-  yimo: "伊莫·家園圖鑑",
+  calc: "伊莫·家园生产计算",
+  yimo: "伊莫·家园图鉴",
 };
 function switchTab(name) {
   $$("#main-tabs .tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
@@ -1119,7 +1119,7 @@ function switchTab(name) {
   const title = TAB_TITLES[name] || TAB_TITLES.calc;
   $("#brand").textContent = title;
   document.title = title;
-  if (name === "calc")               // 隱藏期間尺寸變化的圖表重排
+  if (name === "calc")               // 隐藏期间尺寸变化的图表重排
     $$(".chart").forEach((el) => el.__chart && el.__chart.resize());
 }
 $("#main-tabs").addEventListener("click", (e) => {
@@ -1130,11 +1130,11 @@ $("#main-tabs").addEventListener("click", (e) => {
 function yimoMatch(f) {
   const ab = {};
   for (const [id, lv] of f.abilities) ab[id] = lv;
-  if (yimoFilter.abilities.size) {   // 所選能力類型全部具備且達到等級
+  if (yimoFilter.abilities.size) {   // 所选能力类型全部具备且达到等级
     for (const id of yimoFilter.abilities)
       if (!(ab[id] != null && ab[id] >= Math.max(yimoFilter.level, 1)))
         return false;
-  } else if (yimoFilter.level >= 2) { // 未選類型: 任意能力達到該等級即可
+  } else if (yimoFilter.level >= 2) { // 未选类型: 任意能力达到该等级即可
     if (!f.abilities.some(([, lv]) => lv >= yimoFilter.level)) return false;
   }
   if (yimoFilter.family &&
@@ -1167,12 +1167,12 @@ function renderYimo() {
     return `<div class="ycard"><div class="yhead">` +
       `<span class="ysn">${head.serial}</span><b>${head.name}</b>` +
       `<span class="yel">${head.element.split("/").map(elName).join("/")}</span></div>${rows}</div>`;
-  }).join("") || `<div class="hint">沒有符合條件的伊莫形態，試試放寬篩選</div>`;
+  }).join("") || `<div class="hint">没有符合条件的伊莫形态，试试放宽筛选</div>`;
   $("#yimo-count").textContent =
     `共 ${bySerial.size} 只伊莫 · ${forms.length} 个形态`;
 }
 
-/* 工作條件(不含性格)在圖鑑中的匹配形態數 */
+/* 岗位条件(不含性格)在图鉴中的匹配形态数 */
 function stationCount(t) {
   if (t.kind === "ability")
     return state.creatures.filter((f) =>
@@ -1183,13 +1183,13 @@ function stationCount(t) {
     FAMILY_SERIALS[t.v].includes(f.serial)).length;
 }
 
-/* 無需工作推薦的建築(田地/林地種什麼都行), 不進工作區 */
+/* 无需岗位推荐的建筑(田地/林地种什么都行), 不进岗位区 */
 const STATION_HIDDEN = new Set(["田地", "林地"]);
 
-/* 不在庫內但有工作條件的建築 */
+/* 不在库内但有岗位条件的建筑 */
 const EXTRA_STATIONS = ["日光灯", "热能炉", "制冷机"];
 
-/* 職位選取態: 點選工作卡後高亮, 手動改變篩選條件即取消 */
+/* 岗位选中态: 点击岗位卡后高亮, 手动改动筛选条件即取消 */
 let stationSel = "";
 function clearStationSel() {
   if (!stationSel) return;
@@ -1197,8 +1197,8 @@ function clearStationSel() {
   $$("#station-grid .stcard.sel").forEach((c) => c.classList.remove("sel"));
 }
 
-/* 排序鍵 = 所需屬性(能力ID): 元素按 1000~1008, 家族按圖示能力(1102/1103),
-   手工1101; 無條件(待補充)排最後; 同鍵保持原有先後 */
+/* 排序键 = 所需属性(能力ID): 元素按 1000~1008, 家族按图标能力(1102/1103),
+   手工1101; 无条件(待补充)排最后; 同键保持原有先后 */
 function stationSortKey(name) {
   const t = STATION_TRAITS[name];
   if (!t) return 9999;
@@ -1221,15 +1221,15 @@ function renderStations() {
           `<div class="streq muted">数据待补充</div></div>`;
       const icon = t.kind === "ability" ? t.v
         : t.kind === "element" ? EL_ABID[t.v]
-        : (t.icon || 1102);                // 家族專供建築: 預設遊玩, 採香家族用製香
+        : (t.icon || 1102);                // 家族专供建筑: 默认游玩, 采香家族用制香
       const badge = t.mbti
         ? `<span class="stmbti ${"INFP".includes(t.mbti) ? "warm" : "cool"}" title="${MBTI_DESC[t.mbti] || ""}性格">${t.mbti}</span>`
-        : `<span class="stmbti none" title="無性格要求">?</span>`;
+        : `<span class="stmbti none" title="无性格要求">?</span>`;
       return `<div class="stcard${name === stationSel ? " sel" : ""}" data-station="${name}" role="button" tabindex="0">` +
         `<div class="stb">${name}</div>` +
         `<div class="streq">${badge}` +
         (icon ? `<img class="sico" src="${abIcon(icon)}" alt="">` : "") +
-        `${t.text}<span class="stcnt">${stationCount(t)} 形態</span></div></div>`;
+        `${t.text}<span class="stcnt">${stationCount(t)} 形态</span></div></div>`;
     }).join("");
 }
 
@@ -1269,8 +1269,8 @@ function resetYimoFilter() {
   renderYimo();
 }
 
-/* 點選工作 -> 依該工作先天條件篩選(性格為後天養成不參與)
-   屬性條件折算為對應的元素能力(如 風屬性 -> 能力"風") */
+/* 点击岗位卡片 -> 按该岗位先天条件筛选(性格为后天养成不参与)
+   属性条件折算为对应的元素能力(如 风属性 -> 能力"风") */
 function applyStationFilter(name) {
   const t = STATION_TRAITS[name];
   if (!t) return;
@@ -1338,14 +1338,14 @@ function initYimo() {
   });
 }
 
-/* ---------------- 訪問統計(GoatCounter) ----------------
-   註冊 goatcounter.com 後: Settings→API→Create key(只勾 Read statistics),
-   把 site 與 token 填到下面, 並把 demo 改為 false 即啟用真實數據 */
+/* ---------------- 访问统计(GoatCounter) ----------------
+   注册 goatcounter.com 后: Settings→API→Create key(只勾 Read statistics),
+   把 site 与 token 填到下面, 并把 demo 改为 false 即启用真实数据 */
 const GOAT = {
   site: "https://emilio.goatcounter.com",
   token: "1cveakv36lx6w15i9um2hsbpcn14bu8woakh7wvd2igbmew3br4",
 };
-/* 總訪問=全部瀏覽量; 目前在線=今日當前小時的訪問量(API僅支援按小時) */
+/* 总访问=全部浏览量; 当前在线=今日当前小时的访问量(API仅支持按小时) */
 async function goatFetch() {
   try {
     const r = await fetch(`${GOAT.site}/api/v0/stats/total?start=2000-01-01`,
@@ -1384,7 +1384,7 @@ async function initAnalytics() {
     await refreshData();
     await runOptimize();
   } catch (e) {
-    showError("初始化失敗: " + e.message);
+    showError("初始化失败: " + e.message);
   }
   initAnalytics();
 })();
