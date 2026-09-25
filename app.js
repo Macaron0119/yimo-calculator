@@ -14,7 +14,6 @@ const fmt1 = (n) =>
   n == null || isNaN(n) ? "—" :
   Number(n).toLocaleString("zh-CN", { maximumFractionDigits: 1 });
 
-/* 高區分度配色: 相鄰色相/明度差異大, 白字對比均≥4.5:1 */
 const PALETTE = ["#1D4ED8", "#C2410C", "#0F766E", "#7C3AED", "#BE185D",
   "#4D7C0F", "#92400E", "#0E7490", "#6D28D9", "#B91C1C", "#475569",
   "#A16207", "#15803D", "#86198F", "#9A3412", "#1E3A8A"];
@@ -24,7 +23,6 @@ const colorOf = (label) => {
     colorCache[label] = PALETTE[Object.keys(colorCache).length % PALETTE.length];
   return colorCache[label];
 };
-/* 背景色上用黑字還是白字(相對亮度) */
 const inkOn = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -40,7 +38,6 @@ const state = {
   creatures: [], formLabels: {},
 };
 
-/* 與後端 unique_label 一致的配方顯示名(同名碰撞時高產版加"高速", 不顯示等級)*/
 function recipeLabel(r) {
   const sibs = state.recipes.filter((x) => x.building === r.building && x.name === r.name);
   if (new Set(sibs.map((x) => x.output_qty)).size < 2)
@@ -54,7 +51,6 @@ function recipeLabel(r) {
   return top.length === 1 && top[0].id === r.id ? `${r.name}(高速)` : r.name;
 }
 
-/* ---------------- 工具 ---------------- */
 function chart(id) {
   const el = $("#" + id);
   if (!el.__chart) el.__chart = echarts.init(el);
@@ -99,7 +95,6 @@ function recipesValue() {
   const v = $("#max-recipes").value;
   return v === "" ? null : parseInt(v, 10);
 }
-/* ---------------- 最優方案 ---------------- */
 async function runOptimize() {
   const btn = $("#btn-run");
   btn.disabled = true; btn.textContent = "計算中…";
@@ -108,7 +103,7 @@ async function runOptimize() {
     let pinData;
     try { pinData = collectPinRows(); }
     catch (e) { showError(e.message); return; }
-    await new Promise((r) => setTimeout(r, 30));   // 讓"計算中"先渲染
+    await new Promise((r) => setTimeout(r, 30));
     const engine = await getEngine();
     const result = await engine.optimize({
       level: levelValue(),
@@ -174,16 +169,12 @@ function renderOverview(r) {
   $("#ov-bn2").textContent = `總淨利潤 ${fmt(r.total_int)} ÷ ${r.hours}h`;
 }
 
-/* 各產物淨利: 僅計實際出售的盈餘價值, 中間產物自耗不計收益 */
 function netAgg(r) {
   return r.sells
     .map((s) => ({ label: s.item, qty: s.surplus,
                    net: s.value, perHour: s.value / r.hours }))
     .sort((x, y) => y.net - x.net);
 }
-
-/* ---------------- 種植與生產安排 ---------------- */
-/* 秒 -> "40分鐘" / "2分42秒" / "6小時46分" */
 function timeStr(sec) {
   sec = Math.round(sec);
   if (sec < 90) return `${sec}秒`;
@@ -195,7 +186,6 @@ function timeStr(sec) {
   return m ? `${h}小時${m}分` : `${h}小時`;
 }
 
-/* 種植類: 輪次拆成 "X塊×Y輪·Z時長" 的整數安排(每組並行, 各顯各自時長) */
 function growSplit(batches, cycles) {
   const full = Math.floor(batches / cycles);
   const rem = batches % cycles;
@@ -204,19 +194,13 @@ function growSplit(batches, cycles) {
   if (rem > 0) parts.push({ blocks: 1, cycles: rem });
   return { parts, slots: full + (rem > 0 ? 1 : 0) };
 }
-/* "8塊×36輪·24小時＋1塊×1輪·40分鐘" */
 function growPartsStr(g, timePerBatch) {
   return g.parts.map((pt) =>
     `${pt.blocks}塊×${pt.cycles}輪·${timeStr(pt.cycles * timePerBatch)}`)
     .join("＋");
 }
-/* ---------------- 地塊甘特圖(田地/林地): 每塊地一行的時間軸 ---------------- */
 const GANTT_BUILDINGS = new Set(["田地", "林地"]);
 
-/* 把方案輪次落到每塊地:
-   普通模式 —— 最少換茬貪心: 作物依計畫順序裝入"遊標最早"的地,
-   整塊裝滿, 零頭地由後續作物接續;
-   懶人分時段 —— 依各時段實例數直接分配, 同作物盡量黏在同一塊地 */
 function ganttData(r, building) {
   const T = r.hours * 3600;
   const u = r.utilization.find(x => x.building === building);
@@ -224,12 +208,12 @@ function ganttData(r, building) {
   if (!count) return null;
   const rows = Array.from({ length: count }, () => ({ cursor: 0, segs: [] }));
   if (r.segments && r.segments.length > 1) {
-    const owner = new Map();               // label -> [rowIdx]
+    const owner = new Map();
     for (const seg of r.segments) {
       const items = seg.buildings[building] || [];
       const need = new Map(items.map(x => [x.label, x.instances]));
       if (items.reduce((sm, x) => sm + x.instances, 0) > count) return null;
-      for (const [label, idxs] of owner) {   // 回收多餘地塊
+      for (const [label, idxs] of owner) {
         const keep = need.get(label) || 0;
         while (idxs.length > keep) idxs.pop();
       }
@@ -266,7 +250,7 @@ function ganttData(r, building) {
         if (T - rows[i].cursor < t) continue;
         if (best < 0 || rows[i].cursor < rows[best].cursor) best = i;
       }
-      if (best < 0) break;                 // 容差內放不下的尾差忽略
+      if (best < 0) break;
       const take = Math.min(rem, Math.floor((T - rows[best].cursor) / t));
       const row = rows[best];
       row.segs.push({ label: it.label, from: row.cursor,
@@ -323,7 +307,6 @@ function renderArrangement(r) {
   const T = r.hours * 3600;
 
   if (r.segments && r.segments.length > 1) {
-    // 分時段: 時間軸表格 (所有建築統一切換)
     hint.textContent =
       `懶人模式 · 全程分 ${r.segments.length} 時段，所有建築在 ` +
       r.segments.slice(1).map((s) => `第 ${s.start_h} 小時`).join(" 和 ") + " 統一換配方。";
@@ -350,7 +333,6 @@ function renderArrangement(r) {
     }
     html += `</tbody></table>`;
     html = `<div class="table-wrap">${html}</div>`;
-    // 製造類建築不受切換限制, 單獨列出
     const flex = r.plan.filter((p) => p.flexible);
     if (flex.length) {
       html += `<div class="mt arr-b"><div class="arr-head">製造類建築` +
@@ -367,7 +349,6 @@ function renderArrangement(r) {
     return;
   }
 
-  // 全程單段: 每建築比例條 + 整數口徑明細
     hint.textContent = r.lazy
       ? (r.max_recipes
         ? `原料建築最多 ${r.max_recipes === 1 ? "一" : r.max_recipes} 種產物，自訂生產不佔額；製造建築不限。`
@@ -430,7 +411,6 @@ function renderArrangement(r) {
   bindGanttToggles(body);
 }
 
-/* ---------------- 圖表 ---------------- */
 function renderSellChart(r) {
   chart("chart-sell").setOption({
     color: PALETTE,
@@ -447,7 +427,6 @@ function renderSellChart(r) {
   }, true);
 }
 
-/* 橫向長條圖通用繪製(產物淨利) */
 function renderHBar(elId, rows, valueKey) {
   const el = $("#" + elId);
   el.style.height = Math.max(300, rows.length * 28 + 46) + "px";
@@ -478,7 +457,6 @@ function renderHBar(elId, rows, valueKey) {
   });
 }
 
-/* 數值緊湊格式: 34.5萬 / 1,234 */
 function fmtCompact(v) {
   v = Number(v);
   if (Math.abs(v) >= 10000)
@@ -487,7 +465,7 @@ function fmtCompact(v) {
 }
 
 function renderNetChart(r) {
-  const rows = netAgg(r).reverse();          // 倒序供橫向條形自下而上
+  const rows = netAgg(r).reverse();
   $("#net-title").innerHTML =
     `產物淨利潤（${r.hours} 小時內）` +
     `<span class="hint">只計實際賣出的部分，自用材料不計</span>`;
@@ -528,7 +506,6 @@ function renderRankChart() {
   }, true);
 }
 
-/* ---------------- 方案明細表 ---------------- */
 function renderPlanTable(r) {
   const tbody = $("#plan-table tbody");
   const groups = new Map();
@@ -595,4 +572,760 @@ function renderFlows(r) {
 
 function renderExcluded(r) {
   $("#excluded-list").innerHTML = r.excluded.length
-    ? r.excluded.map((e) => `<span>${e.building}·${e.name}（${e.reason}）</span
+    ? r.excluded.map((e) => `<span>${e.building}·${e.name}（${e.reason}）</span>`).join("")
+    : "<span style='background:#F1EDFB;color:#57449F;border-color:#D9D0F2'>無</span>";
+}
+
+function stockRow(item = "", qty = "") {
+  const div = document.createElement("div");
+  div.className = "stock-row";
+  div.innerHTML =
+    `<input class="s-item" list="item-names" value="${item}" placeholder="資源名稱" aria-label="資源名稱">` +
+    `<input class="s-qty" type="number" min="0" value="${qty}" placeholder="數量" aria-label="數量">` +
+    `<button class="ghost" type="button" title="刪除此行">×</button>`;
+  const iItem = div.querySelector(".s-item");
+  const iQty = div.querySelector(".s-qty");
+  const updateFilled = () =>
+    div.classList.toggle("filled",
+      !!(iItem.value.trim() && parseFloat(iQty.value) > 0));
+  const autoGrow = () => {
+    if (div.classList.contains("filled") &&
+        div === $("#stock-rows").lastElementChild)
+      $("#stock-rows").appendChild(stockRow());
+  };
+  iItem.addEventListener("input", updateFilled);
+  iQty.addEventListener("input", () => { updateFilled(); autoGrow(); });
+  updateFilled();
+  div.querySelector("button").onclick = () => div.remove();
+  return div;
+}
+
+function renderStockRows() {
+  const box = $("#stock-rows");
+  box.innerHTML = "";
+  for (const [item, qty] of Object.entries(state.stock))
+    box.appendChild(stockRow(item, qty));
+  box.appendChild(stockRow());
+  $("#stock-status").textContent = Object.keys(state.stock).length
+    ? `已保存 ${Object.keys(state.stock).length} 項存量` : "暫無保存的存量";
+}
+
+function collectStockRows() {
+  const out = {};
+  $$("#stock-rows .stock-row").forEach((row) => {
+    const item = row.querySelector(".s-item").value.trim();
+    const qty = parseFloat(row.querySelector(".s-qty").value);
+    if (item && !isNaN(qty) && qty > 0) out[item] = qty;
+  });
+  return out;
+}
+
+function persistStock() {
+  state.stock = collectStockRows();
+  store.save({ stock: state.stock });
+  $("#stock-status").textContent = Object.keys(state.stock).length
+    ? `已存 ${Object.keys(state.stock).length} 項（本機自動儲存）`
+    : "已清空（本機自動儲存）";
+}
+
+function renderStockUsed(r) {
+  const el = $("#stock-used");
+  const entries = Object.entries(r.stock_used || {});
+  if (!entries.length) {
+    el.classList.add("hidden");
+    return;
+  }
+  entries.sort((a, b) => b[1].value - a[1].value);
+  const total = entries.reduce((s, [, v]) => s + v.value, 0);
+  el.innerHTML = `<b>本方案動用存量：</b>` +
+    entries.map(([it, v]) => `${it} ×${fmt(v.qty)}`).join("、") +
+    `　<span class="hint">（價值 ${fmt(total)}）</span>`;
+  el.classList.remove("hidden");
+}
+
+function pinRow(building = "", recipeId = "", n = "") {
+  const div = document.createElement("div");
+  div.className = "pin-row";
+  const bOpts = `<option value=""${building ? "" : " selected"} disabled>選擇建築…</option>` +
+    state.buildings.map((b) =>
+      `<option${b.name === building ? " selected" : ""}>${b.name}</option>`).join("");
+  div.innerHTML =
+    `<select class="p-building" aria-label="自訂建築">${bOpts}</select>` +
+    `<select class="p-recipe" aria-label="自訂產物">` +
+    `<option value="" disabled selected>選擇產物…</option></select>` +
+    `<input class="p-n" type="number" min="1" placeholder="全部" value="${n}" ` +
+    `title="留空＝整棟建築；填數字＝保底幾個實例" aria-label="自訂數量">` +
+    `<button class="ghost" type="button" title="刪除此行">×</button>`;
+  const bSel = div.querySelector(".p-building");
+  const rSel = div.querySelector(".p-recipe");
+  let curRid = recipeId;
+  const updateFilled = () =>
+    div.classList.toggle("filled", !!(bSel.value && rSel.value));
+  const fillRecipes = () => {
+    const rs = state.recipes.filter((r) => r.building === bSel.value);
+    rSel.innerHTML = `<option value=""${curRid ? "" : " selected"} disabled>選擇產物…</option>` +
+      rs.map((r) => `<option value="${r.id}"${r.id == curRid ? " selected" : ""}>` +
+        `${recipeLabel(r)}</option>`).join("");
+    updateFilled();
+  };
+  const autoGrow = () => {
+    if (div.classList.contains("filled") &&
+        div === $("#pin-rows").lastElementChild)
+      $("#pin-rows").appendChild(pinRow());
+  };
+  fillRecipes();
+  bSel.addEventListener("change", () => { curRid = ""; fillRecipes(); });
+  rSel.addEventListener("change", () => { updateFilled(); autoGrow(); });
+  div.querySelector("button").onclick = () => div.remove();
+  return div;
+}
+
+function renderPinRows() {
+  const box = $("#pin-rows");
+  box.innerHTML = "";
+  for (const p of state.pins)
+    box.appendChild(pinRow(p.building, p.recipe_id, p.n ?? ""));
+  box.appendChild(pinRow());
+  $("#pin-status").textContent = state.pins.length
+    ? `已保存 ${state.pins.length} 項：` + state.pins.map((p) => {
+        const r = state.recipes.find((x) => x.id === p.recipe_id);
+        return `${p.building}→${r ? recipeLabel(r) : "?"}${p.n ? `×${p.n}` : ""}`;
+      }).join("、")
+    : "";
+}
+
+function collectPinRows() {
+  const pins = [];
+  const sum = {}, whole = {}, seen = new Set();
+  $$("#pin-rows .pin-row").forEach((row) => {
+    const b = row.querySelector(".p-building").value;
+    const rid = parseInt(row.querySelector(".p-recipe").value, 10);
+    if (!b || isNaN(rid)) return;
+    const key = `${b}#${rid}`;
+    if (seen.has(key)) {
+      const r = state.recipes.find((x) => x.id === rid);
+      throw new Error(`自訂生產重複：${b}·${r ? recipeLabel(r) : rid}`);
+    }
+    seen.add(key);
+    const cnt = state.buildings.find((x) => x.name === b)?.count ?? 1;
+    const nv = parseInt(row.querySelector(".p-n").value, 10);
+    const hasN = !isNaN(nv) && nv >= 1;
+    if (!hasN) {
+      if (whole[b] || sum[b])
+        throw new Error(`${b} 已有整建築自訂項，不能再疊加其他項`);
+      whole[b] = true;
+    } else {
+      if (whole[b])
+        throw new Error(`${b} 已有整建築自訂項，不能再疊加其他項`);
+      sum[b] = (sum[b] || 0) + nv;
+      if (sum[b] > cnt)
+        throw new Error(`${b} 的自訂實例合計 ${sum[b]}，超過擁有數量 ${cnt}`);
+    }
+    pins.push({ building: b, recipe_id: rid, ...(hasN ? { n: nv } : {}) });
+  });
+  return pins;
+}
+
+function collectEffRows() {
+  const effs = {};
+  $$("#eff-rows input").forEach((i) => {
+    if (i.value === "") return;
+    const v = parseFloat(i.value);
+    if (!isNaN(v) && v > 0 && Math.abs(v - 100) > 1e-9)
+      effs[i.dataset.b] = v / 100;
+  });
+  return effs;
+}
+
+function persistPins() {
+  let pins;
+  try { pins = collectPinRows(); }
+  catch (e) { showError(e.message); return; }
+  state.pins = pins;
+  store.save({ pins: pins.map((p) => {
+    const r = state.recipes.find((x) => x.id === p.recipe_id);
+    return { building: p.building, product: r ? r.name : "", n: p.n };
+  }) });
+  $("#pin-status").textContent = pins.length
+    ? `已設 ${pins.length} 項：` + pins.map((p) => {
+        const r = state.recipes.find((x) => x.id === p.recipe_id);
+        return `${p.building}→${r ? recipeLabel(r) : "?"}${p.n ? `×${p.n}` : ""}`;
+      }).join("、") + "（本機自動儲存）"
+    : "";
+  showError("");
+}
+function persistCounts() {
+  store.save({ counts: collectCounts() });
+}
+
+function renderPinUsed(r) {
+  const el = $("#pin-used");
+  if (!r.pins || !r.pins.length) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.innerHTML = `<b>自訂生產：</b>` +
+    r.pins.map((p) => `${p.building} → ${p.label}${p.n ? ` ×${p.n}（部分）` : ""}`).join("、") +
+    `　<span class="hint">（${r.pins.some((p) => p.n)
+      ? "保底產能，其餘自由安排" : "整棟建築只做這個"}）</span>`;
+  el.classList.remove("hidden");
+}
+
+async function loadProducts() {
+  const engine = await getEngine();
+  state.products = await engine.productAnalysis({
+    level: levelValue(),
+    coeff: coeffValue(),
+    excludeSeasonal: !$("#opt-use-seasonal").checked,
+    buildingEff: collectEffRows(),
+  });
+  renderProducts();
+  renderRankChart();
+}
+
+function renderProducts() {
+  const bfilter = $("#f-building").value;
+  const q = $("#f-search").value.trim().toLowerCase();
+  const onlyAvail = $("#f-avail").checked;
+  const onlyPos = $("#f-positive").checked;
+
+  let rows = state.products.map((p) => ({
+    ...p,
+    matstr: (p.seed_price ? `種子${fmt(p.seed_price)}、` : "") +
+      (p.materials || []).map((m) => `${m.item}×${m.qty ?? "?"}`).join("、"),
+  }));
+  if (bfilter) rows = rows.filter((p) => p.building === bfilter);
+  if (onlyAvail) rows = rows.filter((p) => p.available);
+  if (onlyPos) rows = rows.filter((p) => p.net > 0);
+  if (q) rows = rows.filter((p) =>
+    (p.label + p.building + p.matstr).toLowerCase().includes(q));
+
+  const { k, dir } = state.prodSort;
+  rows.sort((a, b) => {
+    const av = a[k], bv = b[k];
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "string") return dir * av.localeCompare(bv, "zh");
+    return dir * (av - bv);
+  });
+
+  $("#prod-table tbody").innerHTML = rows.map((p) => {
+    const status = p.available
+      ? '<td class="ok">✓ 可用</td>'
+      : `<td class="bad">${p.reason || "不可用"}</td>`;
+    const matTip = (p.materials || []).map((m) =>
+      `${m.item}×${m.qty ?? "?"}（${fmt(m.cost)}）`).join("\n");
+    return `<tr>` +
+      `<td>${p.seasonal ? '<span class="star">★</span>' : ""}${p.label}</td>` +
+      `<td>${p.building}</td>` +
+      `<td>${p.req_level == null ? "—" : p.req_level}</td>` +
+      `<td>${p.time == null ? "—" : fmt1(p.time)}</td>` +
+      `<td>${fmt1(p.output_qty)}</td>` +
+      `<td>${p.sell_price == null ? "不可售" : fmt(p.sell_price)}</td>` +
+      `<td>${fmt(p.gross)}</td>` +
+      `<td>${fmt(p.cost)}</td>` +
+      `<td class="${p.net > 0 ? "ok" : "bad"}">${fmt(p.net)}</td>` +
+      `<td><b>${p.net_per_hour == null ? "—" : fmt(p.net_per_hour)}</b></td>` +
+      status +
+      `<td class="matlist" title="${matTip.replace(/"/g, "&quot;")}">${p.matstr || "—"}</td>` +
+      `</tr>`;
+  }).join("") ||
+    `<tr><td colspan="12" style="text-align:center;color:#64748B">沒有匹配的產物</td></tr>`;
+
+  $$("#prod-table thead th").forEach((th) => {
+    th.classList.toggle("sorted", th.dataset.k === k);
+    th.textContent = th.textContent.replace(/ [↑↓]$/, "");
+    if (th.dataset.k === k) th.textContent += dir > 0 ? " ↑" : " ↓";
+  });
+}
+
+function renderBuildingEditor() {
+  $("#building-editor").innerHTML = state.buildings.map((b) =>
+    `<label>${b.name}<input data-b="${b.name}" type="number" min="0" ` +
+    `value="${b.count ?? 1}" aria-label="${b.name}數量"></label>`).join("");
+  const opts = state.buildings.map((b) =>
+    `<option value="${b.name}">${b.name}</option>`).join("");
+  $("#f-building").innerHTML =
+    `<option value="">全部建築</option>` + opts;
+}
+
+async function refreshData() {
+  const engine = await getEngine();
+  const gdata = await getGameData();
+  const d = store.load();
+  const counts = d.counts || {};
+  state.buildings = engine.buildings.map((b) => ({
+    name: b.name, count: counts[b.name] != null ? counts[b.name] : b.count }));
+  state.recipes = engine.recipes;
+  state.creatures = gdata.creatures || [];
+  state.formLabels = gdata.form_labels || {};
+  state.stock = d.stock || {};
+  state.buildingEff = d.eff || {};
+  state.pins = (d.pins || [])
+    .map((p) => {
+      const r = state.recipes.find((x) =>
+        x.building === p.building && x.name === p.product);
+      return r ? { building: p.building, recipe_id: r.id, n: p.n } : null;
+    })
+    .filter(Boolean);
+  restoreSettings(d.settings || {});
+  renderBuildingEditor();
+  renderStockRows();
+  renderEffRows();
+  renderPinRows();
+  $("#stock-status").textContent = Object.keys(state.stock).length
+    ? `已存 ${Object.keys(state.stock).length} 項（本機）` : "";
+  const names = [...new Set(state.recipes.flatMap((r) =>
+    [r.name, r.extra_product, ...r.inputs.map((i) => i.item)].filter(Boolean)))]
+    .sort((a, b) => a.localeCompare(b, "zh"));
+  $("#item-names").innerHTML = names.map((n) => `<option value="${n}">`).join("");
+  await loadProducts();
+  initYimo();
+}
+
+function restoreSettings(s) {
+  if (s.level == null && !s.mig10) {
+    s.level = 10;
+    s.mig10 = true;
+    store.save({ settings: s });
+  }
+  if ("level" in s) $("#level").value = s.level == null ? "" : s.level;
+  if (s.hours) {
+    $("#hours").value = String(s.hours);
+    if (s.hoursCustom != null) $("#hours-custom").value = s.hoursCustom;
+    $("#hours-custom").classList.toggle("hidden", $("#hours").value !== "custom");
+  }
+  if (s.coeff != null) $("#coeff").value = s.coeff;
+  if (s.useSeasonal) $("#opt-use-seasonal").checked = true;
+  if (s.lazy) $("#opt-lazy").checked = true;
+  if (s.maxRecipes != null) $("#max-recipes").value = String(s.maxRecipes);
+  if (s.maxSwitch != null) $("#max-switch").value = String(s.maxSwitch);
+  syncLazyControls();
+}
+function saveSettings() {
+  store.save({ settings: {
+    level: $("#level").value === "" ? null : parseInt($("#level").value, 10),
+    hours: $("#hours").value,
+    hoursCustom: $("#hours-custom").value,
+    coeff: $("#coeff").value,
+    useSeasonal: $("#opt-use-seasonal").checked,
+    lazy: $("#opt-lazy").checked,
+    maxRecipes: $("#max-recipes").value,
+    maxSwitch: $("#max-switch").value,
+    mig10: true,
+  } });
+}
+
+$("#btn-run").addEventListener("click", async () => {
+  await Promise.all([runOptimize(), loadProducts()]);
+});
+
+$("#hours").addEventListener("change", () =>
+  $("#hours-custom").classList.toggle("hidden", $("#hours").value !== "custom"));
+
+function syncLazyControls() {
+  const on = $("#opt-lazy").checked;
+  $("#sw-wrap").classList.toggle("hidden", !on);
+  $("#sw2-wrap").classList.toggle("hidden", !on);
+  const uniform = $("#max-recipes").value === "1";
+  $("#max-switch").disabled = uniform;
+  if (uniform) $("#max-switch").value = "0";
+}
+$("#opt-lazy").addEventListener("change", syncLazyControls);
+$("#max-recipes").addEventListener("change", syncLazyControls);
+
+$("#f-building").addEventListener("change", renderProducts);
+$("#f-search").addEventListener("input", renderProducts);
+$("#f-avail").addEventListener("change", renderProducts);
+$("#f-positive").addEventListener("change", renderProducts);
+
+$("#btn-stock-add").addEventListener("click", () =>
+  $("#stock-rows").appendChild(stockRow()));
+
+function renderEffRows() {
+  const wl = [...new Set(state.recipes
+    .filter((r) => r.workload != null).map((r) => r["building"]))]
+    .sort((a, b) => a.localeCompare(b, "zh"));
+  $("#eff-rows").innerHTML = wl.map((b) => {
+    const v = state.buildingEff[b];
+    return `<label class="eff-cell${v ? " filled" : ""}">${b}` +
+      `<span style="display:flex;align-items:center;gap:4px">` +
+      `<input data-b="${b}" type="number" min="5" max="1000" step="5" ` +
+      `value="${v ? Math.round(v * 100) : ""}" placeholder="全局" ` +
+      `aria-label="${b}效率">%</span></label>`;
+  }).join("");
+  $$("#eff-rows input").forEach((i) =>
+    i.addEventListener("input", () =>
+      i.closest(".eff-cell").classList.toggle("filled", i.value !== "")));
+  $("#eff-status").textContent = Object.keys(state.buildingEff).length
+    ? `已保存 ${Object.keys(state.buildingEff).length} 項覆蓋（${Object.entries(state.buildingEff)
+        .map(([b, e]) => `${b} ${Math.round(e * 100)}%`).join("、")}）`
+    : "其餘建築跟隨全域係數";
+}
+
+function persistEff() {
+  state.buildingEff = collectEffRows();
+  store.save({ eff: state.buildingEff });
+  $("#eff-status").textContent = Object.keys(state.buildingEff).length
+    ? `已設 ${Object.keys(state.buildingEff).length} 項（本機自動儲存）`
+    : "其餘建築跟隨全域係數";
+}
+
+$("#btn-pin-add").addEventListener("click", () =>
+  $("#pin-rows").appendChild(pinRow()));
+
+$$("#prod-table thead th").forEach((th) => {
+  if (!th.dataset.k) return;
+  th.addEventListener("click", () => {
+    const k = th.dataset.k;
+    state.prodSort = {
+      k,
+      dir: state.prodSort.k === k ? -state.prodSort.dir : -1,
+    };
+    renderProducts();
+  });
+});
+
+let saveTimer = null;
+const autoSave = (fn) => () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(fn, 350);
+};
+let recomputeTimer = null;
+$("#building-editor").addEventListener("input", autoSave(() => {
+  persistCounts();
+  clearTimeout(recomputeTimer);
+  recomputeTimer = setTimeout(() => runOptimize(), 800);
+}));
+$("#stock-rows").addEventListener("input", autoSave(persistStock));
+$("#eff-rows").addEventListener("input", autoSave(persistEff));
+$("#pin-rows").addEventListener("change", autoSave(persistPins));
+$("#pin-rows").addEventListener("input", autoSave(persistPins));
+["#level", "#hours", "#hours-custom", "#coeff", "#opt-use-seasonal",
+ "#opt-lazy", "#max-recipes", "#max-switch"].forEach((sel) => {
+  const el = $(sel);
+  el.addEventListener("change", saveSettings);
+  el.addEventListener("input", autoSave(saveSettings));
+});
+
+const ABILITY_NAMES = {
+  1000: "火", 1001: "草", 1002: "水", 1003: "土", 1004: "電", 1005: "冰",
+  1006: "風", 1007: "暗", 1008: "光", 1100: "搬運", 1101: "手工",
+  1102: "遊玩", 1103: "調香",
+};
+const EL_DISPLAY = { "岩": "土" };
+const elName = (e) => EL_DISPLAY[e] || e;
+const EL_ABID = {
+  "火": 1000, "草": 1001, "水": 1002, "岩": 1003, "電": 1004,
+  "冰": 1005, "風": 1006, "暗": 1007, "光": 1008,
+};
+const abIcon = (id) => `./icons/${id}.png`;
+const STAGE_NAMES = { "1": "新生期", "2": "成長期", "3": "成熟期" };
+
+const FAMILY_SERIALS = {
+  "雲朵羊": ["017", "018", "019"],
+  "羞羞獺": ["049", "050", "051", "052"],
+  "採蜜鳥": ["038", "039"],
+};
+
+const STATION_TRAITS = {
+  "礦山":         { mbti: "P", kind: "element", v: "岩", text: "土屬性" },
+  "煙囪煅燒爐":   { mbti: "S", kind: "element", v: "火", text: "火屬性" },
+  "木工台":       { mbti: "E", kind: "ability", v: 1101, text: "手工屬性" },
+  "綿雲草床":     { mbti: "J", kind: "family",  v: "雲朵羊", text: "雲朵羊家族" },
+  "汐語沙堡":     { mbti: "J", kind: "family",  v: "羞羞獺", text: "羞羞獺家族" },
+  "採蜜鳥屋":     { mbti: "I", kind: "family",  v: "採蜜鳥", text: "採蜜鳥家族", icon: 1103 },
+  "水井":         { mbti: "F", kind: "element", v: "水", text: "水屬性" },
+  "手作台":       { mbti: "J", kind: "ability", v: 1101, text: "手工屬性" },
+  "旋轉木馬磨坊": { mbti: "T", kind: "element", v: "風", text: "風屬性" },
+  "摩天輪紡車":   { mbti: "F", kind: "element", v: "風", text: "風屬性" },
+  "風味醃製罐":   { mbti: "P", kind: "element", v: "暗", text: "暗屬性" },
+  "超旺爐灶":     { mbti: "N", kind: "element", v: "火", text: "火屬性" },
+  "蹦蹦釀造桶":   { mbti: "E", kind: "element", v: "水", text: "水屬性" },
+  "音樂烘乾機":   { mbti: "N", kind: "element", v: "暗", text: "暗屬性" },
+  "熬煮鍋":       { mbti: "T", kind: "element", v: "火", text: "火屬性" },
+  "留聲調香台":   { mbti: "I", kind: "family",  v: "採蜜鳥", text: "採蜜鳥家族", icon: 1103 },
+  "抓抓烹飪爐":   { mbti: "S", kind: "element", v: "火", text: "火屬性" },
+  "日光燈":       { mbti: "",  kind: "element", v: "光", text: "光屬性" },
+  "熱能爐":       { mbti: "",  kind: "element", v: "火", text: "火屬性" },
+  "製冷機":       { mbti: "",  kind: "element", v: "冰", text: "冰屬性" },
+};
+const MBTI_DESC = {
+  E: "外向", I: "內向", S: "實感", N: "直覺",
+  T: "思考", F: "情感", J: "條理", P: "隨性",
+};
+
+const yimoFilter = {
+  abilities: new Set(),
+  level: 0, family: "", q: "",
+};
+let yimoReady = false;
+
+const TAB_TITLES = {
+  calc: "伊莫·家園生產計算",
+  yimo: "伊莫·家園圖鑑",
+};
+function switchTab(name) {
+  $$("#main-tabs .tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  $("#tab-calc").classList.toggle("hidden", name !== "calc");
+  $("#tab-yimo").classList.toggle("hidden", name !== "yimo");
+  const title = TAB_TITLES[name] || TAB_TITLES.calc;
+  $("#brand").textContent = title;
+  document.title = title;
+  if (name === "calc")
+    $$(".chart").forEach((el) => el.__chart && el.__chart.resize());
+}
+$("#main-tabs").addEventListener("click", (e) => {
+  const b = e.target.closest(".tab");
+  if (b) switchTab(b.dataset.tab);
+});
+
+function yimoMatch(f) {
+  const ab = {};
+  for (const [id, lv] of f.abilities) ab[id] = lv;
+  if (yimoFilter.abilities.size) {
+    for (const id of yimoFilter.abilities)
+      if (!(ab[id] != null && ab[id] >= Math.max(yimoFilter.level, 1)))
+        return false;
+  } else if (yimoFilter.level >= 2) {
+    if (!f.abilities.some(([, lv]) => lv >= yimoFilter.level)) return false;
+  }
+  if (yimoFilter.family &&
+      !FAMILY_SERIALS[yimoFilter.family].includes(f.serial))
+    return false;
+  if (yimoFilter.q && !f.name.includes(yimoFilter.q) &&
+      !f.serial.includes(yimoFilter.q))
+    return false;
+  return true;
+}
+
+function renderYimo() {
+  const forms = state.creatures.filter(yimoMatch);
+  const bySerial = new Map();
+  for (const f of forms) {
+    if (!bySerial.has(f.serial)) bySerial.set(f.serial, []);
+    bySerial.get(f.serial).push(f);
+  }
+  const hot = (id) => yimoFilter.abilities.has(id);
+  $("#yimo-results").innerHTML = [...bySerial.values()].map((fs) => {
+    const head = fs[0];
+    const rows = fs.map((f) => {
+      const fl = state.formLabels[f.form] || f.form;
+      const abs = f.abilities.map(([id, lv]) =>
+        `<span class="yab${hot(id) ? " hot" : ""}"><img src="${abIcon(id)}" alt="">${ABILITY_NAMES[id] || id}<i>Lv${lv}</i></span>`).join("");
+      return `<div class="yrow"><span class="yform">${fl}</span>` +
+        `<span class="ystage">${STAGE_NAMES[f.stage] || ""}</span>` +
+        `<span class="yabs">${abs}</span></div>`;
+    }).join("");
+    return `<div class="ycard"><div class="yhead">` +
+      `<span class="ysn">${head.serial}</span><b>${head.name}</b>` +
+      `<span class="yel">${head.element.split("/").map(elName).join("/")}</span></div>${rows}</div>`;
+  }).join("") || `<div class="hint">沒有符合條件的伊莫形態，試試放寬篩選</div>`;
+  $("#yimo-count").textContent =
+    `共 ${bySerial.size} 隻伊莫 · ${forms.length} 個形態`;
+}
+
+function stationCount(t) {
+  if (t.kind === "ability")
+    return state.creatures.filter((f) =>
+      f.abilities.some(([id]) => id === t.v)).length;
+  if (t.kind === "element")
+    return state.creatures.filter((f) => f.element.split("/").includes(t.v)).length;
+  return state.creatures.filter((f) =>
+    FAMILY_SERIALS[t.v].includes(f.serial)).length;
+}
+
+const STATION_HIDDEN = new Set(["田地", "林地"]);
+
+const EXTRA_STATIONS = ["日光燈", "熱能爐", "製冷機"];
+
+let stationSel = "";
+function clearStationSel() {
+  if (!stationSel) return;
+  stationSel = "";
+  $$("#station-grid .stcard.sel").forEach((c) => c.classList.remove("sel"));
+}
+
+function stationSortKey(name) {
+  const t = STATION_TRAITS[name];
+  if (!t) return 9999;
+  if (t.kind === "ability") return t.v;
+  if (t.kind === "element") return EL_ABID[t.v];
+  return t.icon || 1102;
+}
+
+function renderStations() {
+  const names = [...state.buildings.map((b) => b.name), ...EXTRA_STATIONS]
+    .filter((n) => !STATION_HIDDEN.has(n))
+    .map((n, i) => [n, i])
+    .sort((a, b) => stationSortKey(a[0]) - stationSortKey(b[0]) || a[1] - b[1])
+    .map(([n]) => n);
+  $("#station-grid").innerHTML = names
+    .map((name) => {
+      const t = STATION_TRAITS[name];
+      if (!t)
+        return `<div class="stcard missing"><div class="stb">${name}</div>` +
+          `<div class="streq muted">資料待補充</div></div>`;
+      const icon = t.kind === "ability" ? t.v
+        : t.kind === "element" ? EL_ABID[t.v]
+        : (t.icon || 1102);
+      const badge = t.mbti
+        ? `<span class="stmbti ${"INFP".includes(t.mbti) ? "warm" : "cool"}" title="${MBTI_DESC[t.mbti] || ""}性格">${t.mbti}</span>`
+        : `<span class="stmbti none" title="無性格要求">?</span>`;
+      return `<div class="stcard${name === stationSel ? " sel" : ""}" data-station="${name}" role="button" tabindex="0">` +
+        `<div class="stb">${name}</div>` +
+        `<div class="streq">${badge}` +
+        (icon ? `<img class="sico" src="${abIcon(icon)}" alt="">` : "") +
+        `${t.text}<span class="stcnt">${stationCount(t)} 形態</span></div></div>`;
+    }).join("");
+}
+
+function syncYimoChips() {
+  $$("#ab-chips .chip").forEach((c) =>
+    c.classList.toggle("on", yimoFilter.abilities.has(+c.dataset.ab)));
+  $$("#lv-chips .chip").forEach((c) =>
+    c.classList.toggle("on", +c.dataset.lv === yimoFilter.level));
+  $("#family-tag-row").classList.toggle("hidden", !yimoFilter.family);
+  $("#family-tags").innerHTML = yimoFilter.family
+    ? `<button type="button" class="chip on">${yimoFilter.family}家族 ✕</button>` : "";
+}
+
+function buildYimoChips() {
+  const abCnt = {};
+  for (const f of state.creatures) {
+    for (const [id] of f.abilities) abCnt[id] = (abCnt[id] || 0) + 1;
+  }
+  $("#ab-chips").innerHTML = Object.keys(ABILITY_NAMES)
+    .filter((id) => abCnt[id])
+    .map((id) =>
+      `<button type="button" class="chip" data-ab="${id}">` +
+      `<img class="cico" src="${abIcon(id)}" alt="">${ABILITY_NAMES[id]}<i>${abCnt[id]}</i></button>`).join("");
+  $("#lv-chips").innerHTML = [[0, "全部"], [2, "Lv2+"], [3, "Lv3+"], [4, "Lv4"]]
+    .map(([v, t]) =>
+      `<button type="button" class="chip${v === 0 ? " on" : ""}" data-lv="${v}">${t}</button>`).join("");
+}
+
+function resetYimoFilter() {
+  clearStationSel();
+  yimoFilter.abilities.clear();
+  yimoFilter.level = 0;
+  yimoFilter.family = "";
+  yimoFilter.q = "";
+  $("#yimo-search").value = "";
+  syncYimoChips();
+  renderYimo();
+}
+
+function applyStationFilter(name) {
+  const t = STATION_TRAITS[name];
+  if (!t) return;
+  stationSel = name;
+  yimoFilter.abilities.clear();
+  yimoFilter.family = "";
+  if (t.kind === "ability") yimoFilter.abilities.add(t.v);
+  else if (t.kind === "element") yimoFilter.abilities.add(EL_ABID[t.v]);
+  else yimoFilter.family = t.v;
+  $$("#station-grid .stcard").forEach((c) =>
+    c.classList.toggle("sel", c.dataset.station === name));
+  syncYimoChips();
+  renderYimo();
+  $("#yimo-results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+let yimoSearchTimer = null;
+function initYimo() {
+  if (yimoReady || !state.creatures.length) return;
+  yimoReady = true;
+  buildYimoChips();
+  renderStations();
+  syncYimoChips();
+  renderYimo();
+  $("#ab-chips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    clearStationSel();
+    const id = +c.dataset.ab;
+    yimoFilter.abilities.has(id) ? yimoFilter.abilities.delete(id)
+      : yimoFilter.abilities.add(id);
+    syncYimoChips();
+    renderYimo();
+  });
+  $("#lv-chips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    clearStationSel();
+    yimoFilter.level = +c.dataset.lv;
+    syncYimoChips();
+    renderYimo();
+  });
+  $("#family-tags").addEventListener("click", () => {
+    clearStationSel();
+    yimoFilter.family = "";
+    syncYimoChips();
+    renderYimo();
+  });
+  $("#yimo-search").addEventListener("input", () => {
+    clearTimeout(yimoSearchTimer);
+    yimoSearchTimer = setTimeout(() => {
+      yimoFilter.q = $("#yimo-search").value.trim();
+      renderYimo();
+    }, 150);
+  });
+  $("#yimo-reset").addEventListener("click", resetYimoFilter);
+  $("#station-grid").addEventListener("click", (e) => {
+    const card = e.target.closest(".stcard[data-station]");
+    if (card) applyStationFilter(card.dataset.station);
+  });
+  $("#station-grid").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest(".stcard[data-station]");
+    if (card) { e.preventDefault(); applyStationFilter(card.dataset.station); }
+  });
+}
+
+const GOAT = {
+  site: "https://emilio.goatcounter.com",
+  token: "1cveakv36lx6w15i9um2hsbpcn14bu8woakh7wvd2igbmew3br4",
+};
+async function goatFetch() {
+  try {
+    const r = await fetch(`${GOAT.site}/api/v0/stats/total?start=2000-01-01`,
+      { headers: { Authorization: `Bearer ${GOAT.token}` } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const today = new Date().toISOString().slice(0, 10);
+    const row = (d.stats || []).find((x) => x.day === today);
+    return { total: d.total || 0, hour: (row && row.hourly[new Date().getHours()]) || 0 };
+  } catch { return null; }
+}
+function renderStats(total, online) {
+  const bar = $("#stats-bar");
+  if (total == null && online == null) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  if (total != null) $("#st-total").textContent = total.toLocaleString("zh-CN");
+  if (online != null) $("#st-online").textContent = online.toLocaleString("zh-CN");
+}
+async function refreshStats() {
+  const d = await goatFetch();
+  renderStats(d ? d.total : null, d ? d.hour : null);
+}
+async function initAnalytics() {
+  if (!GOAT.site || !GOAT.token) return;
+  const sc = document.createElement("script");
+  sc.async = true;
+  sc.dataset.goatcounter = `${GOAT.site}/count`;
+  sc.src = "https://gc.zgo.at/count.v3.js";
+  document.head.appendChild(sc);
+  await refreshStats();
+  setInterval(refreshStats, 60000);
+}
+
+(async function init() {
+  try {
+    await refreshData();
+    await runOptimize();
+  } catch (e) {
+    showError("初始化失敗: " + e.message);
+  }
+  initAnalytics();
+})();
